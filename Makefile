@@ -1,4 +1,4 @@
-.PHONY: build install clean dev frontend backend test lint help restart restart-fe kill watch-backend watch-frontend
+.PHONY: build install clean dev frontend backend test lint help restart restart-fe kill watch-backend watch-frontend preview
 .PHONY: release release-binaries-dry docker docker-multiarch docker-push
 
 VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo "dev")
@@ -78,6 +78,12 @@ run:
 # Run in dev mode (serve frontend from web/dist instead of embedded)
 run-dev:
 	./radar --kubeconfig ~/.kube/config --dev
+
+# Download and run a PR preview build
+# Usage: make preview PR=123
+preview:
+	@test -n "$(PR)" || { echo "Usage: make preview PR=123"; exit 1; }
+	bash scripts/preview.sh $(PR)
 
 ## Utility targets
 
@@ -168,6 +174,7 @@ help:
 	@echo "  make watch-frontend  - Vite dev server with HMR (port 9273)"
 	@echo "  make watch-backend   - Go with air hot reload (port 9280)"
 	@echo "  make run             - Run built binary"
+	@echo "  make preview PR=123  - Download and run a PR preview build"
 	@echo "  make test            - Run tests"
 	@echo ""
 	@echo "Docker & In-Cluster:"
