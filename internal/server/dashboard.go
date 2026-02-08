@@ -80,6 +80,7 @@ type DashboardResourceCounts struct {
 	Secrets      int           `json:"secrets"`
 	PVCs         PVCCount      `json:"pvcs"`
 	HelmReleases int           `json:"helmReleases"`
+	Restricted   []string      `json:"restricted,omitempty"` // Resource kinds the user cannot list
 }
 
 type WorkloadCount struct {
@@ -181,8 +182,9 @@ type DashboardTopFlow struct {
 }
 
 type DashboardHelmSummary struct {
-	Total    int                    `json:"total"`
-	Releases []DashboardHelmRelease `json:"releases"`
+	Total      int                    `json:"total"`
+	Releases   []DashboardHelmRelease `json:"releases"`
+	Restricted bool                   `json:"restricted,omitempty"` // True when user lacks permissions to list Helm releases
 }
 
 type DashboardHelmRelease struct {
@@ -575,6 +577,7 @@ func podToProblem(pod *corev1.Pod, severity string, now time.Time) DashboardProb
 
 func (s *Server) getDashboardResourceCounts(cache *k8s.ResourceCache, namespace string) DashboardResourceCounts {
 	counts := DashboardResourceCounts{}
+	var restricted []string
 
 	// Pods
 	var pods []*corev1.Pod
@@ -584,6 +587,8 @@ func (s *Server) getDashboardResourceCounts(cache *k8s.ResourceCache, namespace 
 		} else {
 			pods, _ = podLister.List(labels.Everything())
 		}
+	} else {
+		restricted = append(restricted, "pods")
 	}
 	counts.Pods.Total = len(pods)
 	for _, pod := range pods {
@@ -622,6 +627,8 @@ func (s *Server) getDashboardResourceCounts(cache *k8s.ResourceCache, namespace 
 				}
 			}
 		}
+	} else {
+		restricted = append(restricted, "deployments")
 	}
 
 	// StatefulSets (only count those with replicas > 0)
@@ -653,6 +660,8 @@ func (s *Server) getDashboardResourceCounts(cache *k8s.ResourceCache, namespace 
 				}
 			}
 		}
+	} else {
+		restricted = append(restricted, "statefulsets")
 	}
 
 	// DaemonSets (only count those with desired > 0)
@@ -684,6 +693,8 @@ func (s *Server) getDashboardResourceCounts(cache *k8s.ResourceCache, namespace 
 				}
 			}
 		}
+	} else {
+		restricted = append(restricted, "daemonsets")
 	}
 
 	// Services
@@ -695,6 +706,8 @@ func (s *Server) getDashboardResourceCounts(cache *k8s.ResourceCache, namespace 
 			svcs, _ := svcLister.List(labels.Everything())
 			counts.Services = len(svcs)
 		}
+	} else {
+		restricted = append(restricted, "services")
 	}
 
 	// Ingresses
@@ -706,6 +719,8 @@ func (s *Server) getDashboardResourceCounts(cache *k8s.ResourceCache, namespace 
 			ings, _ := ingLister.List(labels.Everything())
 			counts.Ingresses = len(ings)
 		}
+	} else {
+		restricted = append(restricted, "ingresses")
 	}
 
 	// Nodes (cluster-scoped, not filtered by namespace)
@@ -726,6 +741,8 @@ func (s *Server) getDashboardResourceCounts(cache *k8s.ResourceCache, namespace 
 				counts.Nodes.NotReady++
 			}
 		}
+	} else {
+		restricted = append(restricted, "nodes")
 	}
 
 	// Namespaces (cluster-scoped)
@@ -757,6 +774,8 @@ func (s *Server) getDashboardResourceCounts(cache *k8s.ResourceCache, namespace 
 				counts.Jobs.Failed += int(j.Status.Failed)
 			}
 		}
+	} else {
+		restricted = append(restricted, "jobs")
 	}
 
 	// CronJobs
@@ -782,6 +801,8 @@ func (s *Server) getDashboardResourceCounts(cache *k8s.ResourceCache, namespace 
 				}
 			}
 		}
+	} else {
+		restricted = append(restricted, "cronjobs")
 	}
 
 	// ConfigMaps
@@ -846,6 +867,7 @@ func (s *Server) getDashboardResourceCounts(cache *k8s.ResourceCache, namespace 
 		}
 	}
 
+	counts.Restricted = restricted
 	return counts
 }
 
@@ -1047,6 +1069,9 @@ func (s *Server) getDashboardHelmSummary(namespace string) DashboardHelmSummary 
 
 	releases, err := helmClient.ListReleases(namespace)
 	if err != nil {
+		if helm.IsForbiddenError(err) {
+			return DashboardHelmSummary{Releases: []DashboardHelmRelease{}, Restricted: true}
+		}
 		return DashboardHelmSummary{Releases: []DashboardHelmRelease{}}
 	}
 

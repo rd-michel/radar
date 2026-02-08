@@ -332,7 +332,7 @@ func openBrowser(url string) {
 }
 
 // checkClusterAccess verifies connectivity to the Kubernetes cluster before starting informers.
-// Uses Discovery().ServerVersion() which only requires minimal permissions.
+// Uses the /version endpoint which only requires minimal permissions.
 // Returns the error from the K8s API if connection or authentication fails.
 // The error is handled gracefully - the UI will show it with retry options.
 func checkClusterAccess() error {
@@ -344,14 +344,12 @@ func checkClusterAccess() error {
 		return fmt.Errorf("kubernetes client not initialized")
 	}
 
-	// Use Discovery().ServerVersion() as connectivity check — it requires
-	// no RBAC permissions beyond basic authentication. Previously we used
-	// Namespaces().List() which fails for namespace-scoped users.
-	_, err := clientset.Discovery().ServerVersion()
+	// Use the REST client directly so the context (and its timeout) is respected.
+	// Discovery().ServerVersion() internally uses context.TODO(), ignoring our timeout.
+	_, err := clientset.Discovery().RESTClient().Get().AbsPath("/version").Do(ctx).Raw()
 	if err != nil {
 		return fmt.Errorf("failed to connect to cluster: %w", err)
 	}
 
-	_ = ctx // ctx used for timeout via cancel
 	return nil
 }

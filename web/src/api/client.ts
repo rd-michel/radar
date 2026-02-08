@@ -112,6 +112,7 @@ export interface DashboardResourceCounts {
   secrets: number
   pvcs: { total: number; bound: number; pending: number; unbound: number }
   helmReleases: number
+  restricted?: string[] // Resource kinds the user cannot list due to RBAC
 }
 
 export interface DashboardEvent {
@@ -162,6 +163,7 @@ export interface DashboardHelmRelease {
 export interface DashboardHelmSummary {
   total: number
   releases: DashboardHelmRelease[]
+  restricted?: boolean // True when user lacks permissions to list Helm releases
 }
 
 export interface DashboardCRDCount {

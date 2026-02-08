@@ -102,7 +102,7 @@ func CheckCapabilities(ctx context.Context) (*Capabilities, error) {
 	var wg sync.WaitGroup
 	var execAllowed, logsAllowed, portForwardAllowed, secretsAllowed, helmWriteAllowed bool
 
-	wg.Add(6)
+	wg.Add(5)
 
 	go func() {
 		defer wg.Done()
