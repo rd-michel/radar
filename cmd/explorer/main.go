@@ -97,6 +97,11 @@ func main() {
 		log.Fatalf("Failed to initialize K8s client: %v", err)
 	}
 
+	// Set fallback namespace for RBAC checks (from --namespace flag)
+	if *namespace != "" {
+		k8s.SetFallbackNamespace(*namespace)
+	}
+
 	if len(kubeconfigDirs) > 0 {
 		log.Printf("Using kubeconfigs from directories: %v", kubeconfigDirs)
 	} else if kubepath := k8s.GetKubeconfigPath(); kubepath != "" {

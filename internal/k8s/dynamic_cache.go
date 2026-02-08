@@ -77,10 +77,19 @@ func InitDynamicResourceCache(changeCh chan ResourceChange) error {
 			return
 		}
 
-		factory := dynamicinformer.NewDynamicSharedInformerFactory(
-			client,
-			0, // no resync - updates come via watch
-		)
+		// Use namespace-scoped factory if the user only has namespace-level access
+		var factory dynamicinformer.DynamicSharedInformerFactory
+		if permResult := GetCachedPermissionResult(); permResult != nil && permResult.NamespaceScoped && permResult.Namespace != "" {
+			factory = dynamicinformer.NewFilteredDynamicSharedInformerFactory(
+				client, 0, permResult.Namespace, nil,
+			)
+			log.Printf("Using namespace-scoped dynamic informers for namespace %q", permResult.Namespace)
+		} else {
+			factory = dynamicinformer.NewDynamicSharedInformerFactory(
+				client,
+				0, // no resync - updates come via watch
+			)
+		}
 
 		dynamicResourceCache = &DynamicResourceCache{
 			factory:         factory,

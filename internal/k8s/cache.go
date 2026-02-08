@@ -113,19 +113,29 @@ func InitResourceCache() error {
 			return
 		}
 
-		factory := informers.NewSharedInformerFactoryWithOptions(
-			k8sClient,
-			0, // no resync - updates come via watch
-			informers.WithTransform(dropManagedFields),
-		)
-
 		stopCh := make(chan struct{})
 		changes := make(chan ResourceChange, 10000)
 
 		// Check RBAC permissions for all resource types before creating informers
-		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-		perms := CheckResourcePermissions(ctx)
+		ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+		permResult := CheckResourcePermissions(ctx)
 		cancel()
+		perms := permResult.Perms
+
+		// Create factory — namespace-scoped if user only has namespace-level access
+		factoryOpts := []informers.SharedInformerOption{
+			informers.WithTransform(dropManagedFields),
+		}
+		if permResult.NamespaceScoped && permResult.Namespace != "" {
+			factoryOpts = append(factoryOpts, informers.WithNamespace(permResult.Namespace))
+			log.Printf("Using namespace-scoped informers for namespace %q", permResult.Namespace)
+		}
+
+		factory := informers.NewSharedInformerFactoryWithOptions(
+			k8sClient,
+			0, // no resync - updates come via watch
+			factoryOpts...,
+		)
 
 		// Build map of enabled resources
 		enabled := map[string]bool{

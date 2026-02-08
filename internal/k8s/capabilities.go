@@ -10,6 +10,13 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
+// clusterScopedResources are K8s resources that exist at cluster scope (not namespaced).
+// These cannot be checked with a namespace-scoped SelfSubjectAccessReview.
+var clusterScopedResources = map[string]bool{
+	"nodes":      true,
+	"namespaces": true,
+}
+
 // ResourcePermissions indicates which resource types the user can list/watch
 type ResourcePermissions struct {
 	Pods                     bool `json:"pods"`
@@ -30,13 +37,20 @@ type ResourcePermissions struct {
 	HorizontalPodAutoscalers bool `json:"horizontalPodAutoscalers"`
 }
 
+// PermissionCheckResult holds the result of RBAC permission checks
+type PermissionCheckResult struct {
+	Perms           *ResourcePermissions
+	NamespaceScoped bool   // True if permissions are namespace-scoped (not cluster-wide)
+	Namespace       string // The namespace checked, when namespace-scoped
+}
+
 // Capabilities represents the features available based on RBAC permissions
 type Capabilities struct {
-	Exec        bool                 `json:"exec"`        // Can create pods/exec (terminal feature)
-	Logs        bool                 `json:"logs"`        // Can get pods/log (log viewer)
-	PortForward bool                 `json:"portForward"` // Can create pods/portforward
-	Secrets     bool                 `json:"secrets"`     // Can list secrets
-	HelmWrite   bool                 `json:"helmWrite"`   // Helm write ops (detected via secrets/create as sentinel RBAC check)
+	Exec        bool                 `json:"exec"`                // Can create pods/exec (terminal feature)
+	Logs        bool                 `json:"logs"`                // Can get pods/log (log viewer)
+	PortForward bool                 `json:"portForward"`         // Can create pods/portforward
+	Secrets     bool                 `json:"secrets"`             // Can list secrets
+	HelmWrite   bool                 `json:"helmWrite"`           // Helm write ops (detected via secrets/create as sentinel RBAC check)
 	Resources   *ResourcePermissions `json:"resources,omitempty"` // Per-resource-type permissions
 }
 
@@ -82,35 +96,52 @@ func CheckCapabilities(ctx context.Context) (*Capabilities, error) {
 	checkCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	// Check each capability in parallel using local variables to avoid data race
+	// Check each capability in parallel using local variables to avoid data race.
+	// Try cluster-wide first, then namespace-scoped as fallback for namespace-scoped users.
+	fallbackNs := GetEffectiveNamespace()
 	var wg sync.WaitGroup
 	var execAllowed, logsAllowed, portForwardAllowed, secretsAllowed, helmWriteAllowed bool
 
-	wg.Add(5)
+	wg.Add(6)
 
 	go func() {
 		defer wg.Done()
-		execAllowed = canI(checkCtx, "", "pods/exec", "create")
+		execAllowed = canI(checkCtx, "", "", "pods/exec", "create")
+		if !execAllowed && fallbackNs != "" {
+			execAllowed = canI(checkCtx, fallbackNs, "", "pods/exec", "create")
+		}
 	}()
 
 	go func() {
 		defer wg.Done()
-		logsAllowed = canI(checkCtx, "", "pods/log", "get")
+		logsAllowed = canI(checkCtx, "", "", "pods/log", "get")
+		if !logsAllowed && fallbackNs != "" {
+			logsAllowed = canI(checkCtx, fallbackNs, "", "pods/log", "get")
+		}
 	}()
 
 	go func() {
 		defer wg.Done()
-		portForwardAllowed = canI(checkCtx, "", "pods/portforward", "create")
+		portForwardAllowed = canI(checkCtx, "", "", "pods/portforward", "create")
+		if !portForwardAllowed && fallbackNs != "" {
+			portForwardAllowed = canI(checkCtx, fallbackNs, "", "pods/portforward", "create")
+		}
 	}()
 
 	go func() {
 		defer wg.Done()
-		secretsAllowed = canI(checkCtx, "", "secrets", "list")
+		secretsAllowed = canI(checkCtx, "", "", "secrets", "list")
+		if !secretsAllowed && fallbackNs != "" {
+			secretsAllowed = canI(checkCtx, fallbackNs, "", "secrets", "list")
+		}
 	}()
 
 	go func() {
 		defer wg.Done()
-		helmWriteAllowed = canI(checkCtx, "", "secrets", "create")
+		helmWriteAllowed = canI(checkCtx, "", "", "secrets", "create")
+		if !helmWriteAllowed && fallbackNs != "" {
+			helmWriteAllowed = canI(checkCtx, fallbackNs, "", "secrets", "create")
+		}
 	}()
 
 	wg.Wait()
@@ -135,8 +166,9 @@ func CheckCapabilities(ctx context.Context) (*Capabilities, error) {
 	return caps, nil
 }
 
-// canI checks if the current user/service account can perform an action
-func canI(ctx context.Context, namespace, resource, verb string) bool {
+// canI checks if the current user/service account can perform an action.
+// The group parameter specifies the API group (empty string for core API resources).
+func canI(ctx context.Context, namespace, group, resource, verb string) bool {
 	k8sClient := GetClient()
 	if k8sClient == nil {
 		log.Printf("Warning: K8s client nil in canI check for %s %s", verb, resource)
@@ -147,6 +179,7 @@ func canI(ctx context.Context, namespace, resource, verb string) bool {
 		Spec: authv1.SelfSubjectAccessReviewSpec{
 			ResourceAttributes: &authv1.ResourceAttributes{
 				Namespace: namespace, // Empty = cluster-wide
+				Group:     group,     // API group (empty = core)
 				Verb:      verb,
 				Resource:  resource,
 			},
@@ -171,7 +204,7 @@ func InvalidateCapabilitiesCache() {
 }
 
 var (
-	cachedResourcePerms *ResourcePermissions
+	cachedPermResult    *PermissionCheckResult
 	resourcePermsMu     sync.RWMutex
 	resourcePermsExpiry time.Time
 	resourcePermsTTL    = 60 * time.Second
@@ -180,12 +213,21 @@ var (
 // CheckResourcePermissions checks RBAC permissions for all resource types using
 // SelfSubjectAccessReview. Results are cached for 60 seconds.
 // This is used at informer startup to decide which informers to create.
-func CheckResourcePermissions(ctx context.Context) *ResourcePermissions {
+//
+// For namespace-scoped users (e.g., ServiceAccounts with RoleBindings), cluster-wide
+// checks will fail. When a fallback namespace is available (from kubeconfig context
+// or --namespace flag), namespace-scoped checks are tried as a second pass.
+func CheckResourcePermissions(ctx context.Context) *PermissionCheckResult {
 	resourcePermsMu.RLock()
-	if cachedResourcePerms != nil && time.Now().Before(resourcePermsExpiry) {
-		perms := *cachedResourcePerms
+	if cachedPermResult != nil && time.Now().Before(resourcePermsExpiry) {
+		permsCopy := *cachedPermResult.Perms
+		result := &PermissionCheckResult{
+			Perms:           &permsCopy,
+			NamespaceScoped: cachedPermResult.NamespaceScoped,
+			Namespace:       cachedPermResult.Namespace,
+		}
 		resourcePermsMu.RUnlock()
-		return &perms
+		return result
 	}
 	resourcePermsMu.RUnlock()
 
@@ -193,52 +235,106 @@ func CheckResourcePermissions(ctx context.Context) *ResourcePermissions {
 	defer resourcePermsMu.Unlock()
 
 	// Double-check after acquiring write lock
-	if cachedResourcePerms != nil && time.Now().Before(resourcePermsExpiry) {
-		perms := *cachedResourcePerms
-		return &perms
+	if cachedPermResult != nil && time.Now().Before(resourcePermsExpiry) {
+		permsCopy := *cachedPermResult.Perms
+		return &PermissionCheckResult{
+			Perms:           &permsCopy,
+			NamespaceScoped: cachedPermResult.NamespaceScoped,
+			Namespace:       cachedPermResult.Namespace,
+		}
 	}
 
 	if GetClient() == nil {
 		log.Printf("Warning: K8s client not initialized, returning no resource permissions")
-		return &ResourcePermissions{}
+		return &PermissionCheckResult{Perms: &ResourcePermissions{}}
 	}
 
 	type permCheck struct {
+		group    string // API group ("" for core, "apps", "batch", etc.)
 		resource string
 		result   *bool
 	}
 
 	perms := &ResourcePermissions{}
 	checks := []permCheck{
-		{"pods", &perms.Pods},
-		{"services", &perms.Services},
-		{"deployments", &perms.Deployments},
-		{"daemonsets", &perms.DaemonSets},
-		{"statefulsets", &perms.StatefulSets},
-		{"replicasets", &perms.ReplicaSets},
-		{"ingresses", &perms.Ingresses},
-		{"configmaps", &perms.ConfigMaps},
-		{"secrets", &perms.Secrets},
-		{"events", &perms.Events},
-		{"persistentvolumeclaims", &perms.PersistentVolumeClaims},
-		{"nodes", &perms.Nodes},
-		{"namespaces", &perms.Namespaces},
-		{"jobs", &perms.Jobs},
-		{"cronjobs", &perms.CronJobs},
-		{"horizontalpodautoscalers", &perms.HorizontalPodAutoscalers},
+		// Core API group
+		{"", "pods", &perms.Pods},
+		{"", "services", &perms.Services},
+		{"", "configmaps", &perms.ConfigMaps},
+		{"", "secrets", &perms.Secrets},
+		{"", "events", &perms.Events},
+		{"", "persistentvolumeclaims", &perms.PersistentVolumeClaims},
+		{"", "nodes", &perms.Nodes},
+		{"", "namespaces", &perms.Namespaces},
+		// apps group
+		{"apps", "deployments", &perms.Deployments},
+		{"apps", "daemonsets", &perms.DaemonSets},
+		{"apps", "statefulsets", &perms.StatefulSets},
+		{"apps", "replicasets", &perms.ReplicaSets},
+		// networking.k8s.io group
+		{"networking.k8s.io", "ingresses", &perms.Ingresses},
+		// batch group
+		{"batch", "jobs", &perms.Jobs},
+		{"batch", "cronjobs", &perms.CronJobs},
+		// autoscaling group
+		{"autoscaling", "horizontalpodautoscalers", &perms.HorizontalPodAutoscalers},
 	}
 
+	// Phase 1: Check all resources cluster-wide
 	var wg sync.WaitGroup
 	wg.Add(len(checks))
 
 	for _, check := range checks {
 		go func(c permCheck) {
 			defer wg.Done()
-			*c.result = canI(ctx, "", c.resource, "list")
+			*c.result = canI(ctx, "", c.group, c.resource, "list")
 		}(check)
 	}
 
 	wg.Wait()
+
+	// Phase 2: If all namespace-scoped resources failed and we have a fallback namespace,
+	// retry those checks scoped to the specific namespace.
+	fallbackNs := GetEffectiveNamespace()
+	namespaceScoped := false
+
+	if fallbackNs != "" {
+		allNamespacedFailed := true
+		for _, check := range checks {
+			if !clusterScopedResources[check.resource] && *check.result {
+				allNamespacedFailed = false
+				break
+			}
+		}
+
+		if allNamespacedFailed {
+			log.Printf("RBAC: cluster-wide checks failed for all namespaced resources, retrying in namespace %q", fallbackNs)
+
+			var nsChecks []permCheck
+			for i := range checks {
+				if !clusterScopedResources[checks[i].resource] {
+					nsChecks = append(nsChecks, checks[i])
+				}
+			}
+
+			wg.Add(len(nsChecks))
+			for _, check := range nsChecks {
+				go func(c permCheck) {
+					defer wg.Done()
+					*c.result = canI(ctx, fallbackNs, c.group, c.resource, "list")
+				}(check)
+			}
+			wg.Wait()
+
+			// If any namespace-scoped check passed, we're in namespace-scoped mode
+			for _, check := range nsChecks {
+				if *check.result {
+					namespaceScoped = true
+					break
+				}
+			}
+		}
+	}
 
 	// Log which resources are restricted
 	var restricted []string
@@ -248,18 +344,40 @@ func CheckResourcePermissions(ctx context.Context) *ResourcePermissions {
 		}
 	}
 	if len(restricted) > 0 {
-		log.Printf("RBAC: restricted resources (no list permission): %v", restricted)
+		if namespaceScoped {
+			log.Printf("RBAC: namespace-scoped mode (namespace=%s), restricted resources: %v", fallbackNs, restricted)
+		} else {
+			log.Printf("RBAC: restricted resources (no list permission): %v", restricted)
+		}
 	}
 
-	cachedResourcePerms = perms
+	result := &PermissionCheckResult{
+		Perms:           perms,
+		NamespaceScoped: namespaceScoped,
+		Namespace:       fallbackNs,
+	}
+
+	cachedPermResult = result
 	resourcePermsExpiry = time.Now().Add(resourcePermsTTL)
 
-	return perms
+	return result
+}
+
+// GetCachedPermissionResult returns the cached permission check result, if available.
+// Used by dynamic cache to determine namespace scoping without re-running checks.
+func GetCachedPermissionResult() *PermissionCheckResult {
+	resourcePermsMu.RLock()
+	defer resourcePermsMu.RUnlock()
+	if cachedPermResult == nil {
+		return nil
+	}
+	result := *cachedPermResult
+	return &result
 }
 
 // InvalidateResourcePermissionsCache forces the next CheckResourcePermissions call to refresh
 func InvalidateResourcePermissionsCache() {
 	resourcePermsMu.Lock()
 	defer resourcePermsMu.Unlock()
-	cachedResourcePerms = nil
+	cachedPermResult = nil
 }
