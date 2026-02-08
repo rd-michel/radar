@@ -22,7 +22,6 @@ import (
 	"github.com/skyhook-io/radar/internal/timeline"
 	"github.com/skyhook-io/radar/internal/traffic"
 	versionpkg "github.com/skyhook-io/radar/internal/version"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	_ "k8s.io/client-go/plugin/pkg/client/auth" // Register all auth provider plugins (OIDC, GCP, Azure, etc.)
 	"k8s.io/klog/v2"
 )
@@ -245,9 +244,12 @@ func initializeCluster(timelineStoreCfg timeline.StoreConfig) {
 		ProgressMsg: "Loading workloads...",
 	})
 	if err := k8s.InitResourceCache(); err != nil {
-		log.Fatalf("Failed to initialize resource cache: %v", err)
+		log.Printf("Warning: Failed to initialize resource cache: %v", err)
+		// Continue in degraded mode - some features will be unavailable
 	}
-	log.Printf("Resource cache initialized with %d resources", k8s.GetResourceCache().GetResourceCount())
+	if cache := k8s.GetResourceCache(); cache != nil {
+		log.Printf("Resource cache initialized with %d resources", cache.GetResourceCount())
+	}
 
 	k8s.SetConnectionStatus(k8s.ConnectionStatus{
 		State:       k8s.StateConnecting,
@@ -263,17 +265,19 @@ func initializeCluster(timelineStoreCfg timeline.StoreConfig) {
 		Context:     k8s.GetContextName(),
 		ProgressMsg: "Loading custom resources...",
 	})
-	changeCh := k8s.GetResourceCache().ChangesRaw()
-	if err := k8s.InitDynamicResourceCache(changeCh); err != nil {
-		log.Printf("Warning: Failed to initialize dynamic resource cache: %v", err)
-	}
+	if cache := k8s.GetResourceCache(); cache != nil {
+		changeCh := cache.ChangesRaw()
+		if err := k8s.InitDynamicResourceCache(changeCh); err != nil {
+			log.Printf("Warning: Failed to initialize dynamic resource cache: %v", err)
+		}
 
-	// Warm up dynamic cache for common CRDs so they appear in initial timeline
-	k8s.WarmupCommonCRDs()
+		// Warm up dynamic cache for common CRDs so they appear in initial timeline
+		k8s.WarmupCommonCRDs()
 
-	// Start full CRD discovery in background (for generic CRD topology support)
-	if dynamicCache := k8s.GetDynamicResourceCache(); dynamicCache != nil {
-		dynamicCache.DiscoverAllCRDs()
+		// Start full CRD discovery in background (for generic CRD topology support)
+		if dynamicCache := k8s.GetDynamicResourceCache(); dynamicCache != nil {
+			dynamicCache.DiscoverAllCRDs()
+		}
 	}
 
 	// Initialize metrics history collection (polls metrics-server every 30s)
@@ -323,6 +327,7 @@ func openBrowser(url string) {
 }
 
 // checkClusterAccess verifies connectivity to the Kubernetes cluster before starting informers.
+// Uses Discovery().ServerVersion() which only requires minimal permissions.
 // Returns the error from the K8s API if connection or authentication fails.
 // The error is handled gracefully - the UI will show it with retry options.
 func checkClusterAccess() error {
@@ -334,7 +339,14 @@ func checkClusterAccess() error {
 		return fmt.Errorf("kubernetes client not initialized")
 	}
 
-	// Try to list namespaces as a basic connectivity check
-	_, err := clientset.CoreV1().Namespaces().List(ctx, metav1.ListOptions{Limit: 1})
-	return err
+	// Use Discovery().ServerVersion() as connectivity check — it requires
+	// no RBAC permissions beyond basic authentication. Previously we used
+	// Namespaces().List() which fails for namespace-scoped users.
+	_, err := clientset.Discovery().ServerVersion()
+	if err != nil {
+		return fmt.Errorf("failed to connect to cluster: %w", err)
+	}
+
+	_ = ctx // ctx used for timeout via cancel
+	return nil
 }

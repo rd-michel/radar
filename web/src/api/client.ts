@@ -26,11 +26,25 @@ import type { GitOpsOperationResponse } from '../types/gitops'
 
 const API_BASE = '/api'
 
+// ApiError preserves HTTP status code for callers to distinguish 403/404/500 etc.
+export class ApiError extends Error {
+  status: number
+  constructor(message: string, status: number) {
+    super(message)
+    this.name = 'ApiError'
+    this.status = status
+  }
+}
+
+export function isForbiddenError(error: unknown): boolean {
+  return error instanceof ApiError && error.status === 403
+}
+
 async function fetchJSON<T>(path: string): Promise<T> {
   const response = await fetch(`${API_BASE}${path}`)
   if (!response.ok) {
     const error = await response.json().catch(() => ({ error: 'Unknown error' }))
-    throw new Error(error.error || `HTTP ${response.status}`)
+    throw new ApiError(error.error || `HTTP ${response.status}`, response.status)
   }
   return response.json()
 }

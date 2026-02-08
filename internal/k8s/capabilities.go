@@ -10,13 +10,34 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
+// ResourcePermissions indicates which resource types the user can list/watch
+type ResourcePermissions struct {
+	Pods                     bool `json:"pods"`
+	Services                 bool `json:"services"`
+	Deployments              bool `json:"deployments"`
+	DaemonSets               bool `json:"daemonSets"`
+	StatefulSets             bool `json:"statefulSets"`
+	ReplicaSets              bool `json:"replicaSets"`
+	Ingresses                bool `json:"ingresses"`
+	ConfigMaps               bool `json:"configMaps"`
+	Secrets                  bool `json:"secrets"`
+	Events                   bool `json:"events"`
+	PersistentVolumeClaims   bool `json:"persistentVolumeClaims"`
+	Nodes                    bool `json:"nodes"`
+	Namespaces               bool `json:"namespaces"`
+	Jobs                     bool `json:"jobs"`
+	CronJobs                 bool `json:"cronJobs"`
+	HorizontalPodAutoscalers bool `json:"horizontalPodAutoscalers"`
+}
+
 // Capabilities represents the features available based on RBAC permissions
 type Capabilities struct {
-	Exec        bool `json:"exec"`        // Can create pods/exec (terminal feature)
-	Logs        bool `json:"logs"`        // Can get pods/log (log viewer)
-	PortForward bool `json:"portForward"` // Can create pods/portforward
-	Secrets     bool `json:"secrets"`     // Can list secrets
-	HelmWrite   bool `json:"helmWrite"`   // Helm write ops (detected via secrets/create as sentinel RBAC check)
+	Exec        bool                 `json:"exec"`        // Can create pods/exec (terminal feature)
+	Logs        bool                 `json:"logs"`        // Can get pods/log (log viewer)
+	PortForward bool                 `json:"portForward"` // Can create pods/portforward
+	Secrets     bool                 `json:"secrets"`     // Can list secrets
+	HelmWrite   bool                 `json:"helmWrite"`   // Helm write ops (detected via secrets/create as sentinel RBAC check)
+	Resources   *ResourcePermissions `json:"resources,omitempty"` // Per-resource-type permissions
 }
 
 var (
@@ -147,4 +168,98 @@ func InvalidateCapabilitiesCache() {
 	capabilitiesMu.Lock()
 	defer capabilitiesMu.Unlock()
 	cachedCapabilities = nil
+}
+
+var (
+	cachedResourcePerms *ResourcePermissions
+	resourcePermsMu     sync.RWMutex
+	resourcePermsExpiry time.Time
+	resourcePermsTTL    = 60 * time.Second
+)
+
+// CheckResourcePermissions checks RBAC permissions for all resource types using
+// SelfSubjectAccessReview. Results are cached for 60 seconds.
+// This is used at informer startup to decide which informers to create.
+func CheckResourcePermissions(ctx context.Context) *ResourcePermissions {
+	resourcePermsMu.RLock()
+	if cachedResourcePerms != nil && time.Now().Before(resourcePermsExpiry) {
+		perms := *cachedResourcePerms
+		resourcePermsMu.RUnlock()
+		return &perms
+	}
+	resourcePermsMu.RUnlock()
+
+	resourcePermsMu.Lock()
+	defer resourcePermsMu.Unlock()
+
+	// Double-check after acquiring write lock
+	if cachedResourcePerms != nil && time.Now().Before(resourcePermsExpiry) {
+		perms := *cachedResourcePerms
+		return &perms
+	}
+
+	if GetClient() == nil {
+		log.Printf("Warning: K8s client not initialized, returning no resource permissions")
+		return &ResourcePermissions{}
+	}
+
+	type permCheck struct {
+		resource string
+		result   *bool
+	}
+
+	perms := &ResourcePermissions{}
+	checks := []permCheck{
+		{"pods", &perms.Pods},
+		{"services", &perms.Services},
+		{"deployments", &perms.Deployments},
+		{"daemonsets", &perms.DaemonSets},
+		{"statefulsets", &perms.StatefulSets},
+		{"replicasets", &perms.ReplicaSets},
+		{"ingresses", &perms.Ingresses},
+		{"configmaps", &perms.ConfigMaps},
+		{"secrets", &perms.Secrets},
+		{"events", &perms.Events},
+		{"persistentvolumeclaims", &perms.PersistentVolumeClaims},
+		{"nodes", &perms.Nodes},
+		{"namespaces", &perms.Namespaces},
+		{"jobs", &perms.Jobs},
+		{"cronjobs", &perms.CronJobs},
+		{"horizontalpodautoscalers", &perms.HorizontalPodAutoscalers},
+	}
+
+	var wg sync.WaitGroup
+	wg.Add(len(checks))
+
+	for _, check := range checks {
+		go func(c permCheck) {
+			defer wg.Done()
+			*c.result = canI(ctx, "", c.resource, "list")
+		}(check)
+	}
+
+	wg.Wait()
+
+	// Log which resources are restricted
+	var restricted []string
+	for _, check := range checks {
+		if !*check.result {
+			restricted = append(restricted, check.resource)
+		}
+	}
+	if len(restricted) > 0 {
+		log.Printf("RBAC: restricted resources (no list permission): %v", restricted)
+	}
+
+	cachedResourcePerms = perms
+	resourcePermsExpiry = time.Now().Add(resourcePermsTTL)
+
+	return perms
+}
+
+// InvalidateResourcePermissionsCache forces the next CheckResourcePermissions call to refresh
+func InvalidateResourcePermissionsCache() {
+	resourcePermsMu.Lock()
+	defer resourcePermsMu.Unlock()
+	cachedResourcePerms = nil
 }
