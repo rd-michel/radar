@@ -329,7 +329,7 @@ jobs:
             echo "## Desktop Release ${VERSION}"
             echo ""
             if [[ "$VERSION" == *-* ]]; then
-              echo "> **Pre-release** — Homebrew cask not updated"
+              echo "> **Pre-release** — Homebrew cask and Scoop manifest not updated"
               echo ""
             fi
             echo "### Uploaded Assets"
@@ -384,5 +384,49 @@ jobs:
           git add Casks/radar-desktop.rb
           if ! git diff --staged --quiet; then
             git commit -m "Update radar-desktop cask to ${VERSION}"
+            git push origin main
+          fi
+
+      - name: Update Scoop manifest
+        if: "!contains(github.ref_name, '-')"
+        env:
+          SCOOP_BUCKET_TOKEN: ${{ secrets.SCOOP_BUCKET_TOKEN }}
+        run: |
+          VERSION="${GITHUB_REF_NAME}"
+          VERSION_NUM="${VERSION#v}"
+          SHA256=$(sha256sum "dist/radar-desktop_${VERSION}_windows_amd64.zip" | awk '{print $1}')
+
+          git clone https://x-access-token:${SCOOP_BUCKET_TOKEN}@github.com/skyhook-io/scoop-bucket.git /tmp/scoop-bucket
+
+          cat > /tmp/scoop-bucket/radar-desktop.json <<EOF
+          {
+              "version": "${VERSION_NUM}",
+              "architecture": {
+                  "64bit": {
+                      "url": "https://github.com/skyhook-io/radar/releases/download/${VERSION}/radar-desktop_${VERSION}_windows_amd64.zip",
+                      "bin": [
+                          "Radar.exe"
+                      ],
+                      "shortcuts": [
+                          ["Radar.exe", "Radar"]
+                      ],
+                      "hash": "${SHA256}"
+                  }
+              },
+              "homepage": "https://github.com/skyhook-io/radar",
+              "license": "Apache-2.0",
+              "description": "Radar Desktop — Kubernetes visibility with topology, traffic, and Helm management",
+              "post_install": [
+                  "Write-Host 'Radar Desktop installed. Launch from Start Menu or run: radar-desktop' -ForegroundColor Green"
+              ]
+          }
+          EOF
+
+          cd /tmp/scoop-bucket
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add radar-desktop.json
+          if ! git diff --staged --quiet; then
+            git commit -m "Update radar-desktop to ${VERSION}"
             git push origin main
           fi

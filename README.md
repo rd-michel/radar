@@ -95,7 +95,13 @@ sudo apt install ./radar-desktop_*.deb
 sudo rpm -i radar-desktop_*.rpm
 ```
 
-**Windows** — download from [GitHub Releases](https://github.com/skyhook-io/radar/releases).
+**Scoop (Windows):**
+```powershell
+scoop bucket add skyhook https://github.com/skyhook-io/scoop-bucket
+scoop install radar-desktop
+```
+
+**Windows (direct download)** — [GitHub Releases](https://github.com/skyhook-io/radar/releases).
 
 #### In-Cluster Deployment
 

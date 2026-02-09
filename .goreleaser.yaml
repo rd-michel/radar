@@ -133,7 +133,13 @@ release:
     sudo rpm -i radar-desktop_v{{.Version}}_linux_amd64.rpm
     ```
 
-    **Windows:** Download from the assets below.
+    **Scoop (Windows):**
+    ```powershell
+    scoop bucket add skyhook https://github.com/skyhook-io/scoop-bucket
+    scoop install radar-desktop
+    ```
+
+    **Windows (direct download):** Download from the assets below.
 
     ### CLI
 
