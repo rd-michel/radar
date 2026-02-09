@@ -78,6 +78,20 @@ jobs:
             checksums-darwin.txt
           retention-days: 1
 
+      - name: Build summary
+        if: always()
+        run: |
+          {
+            echo "## macOS Desktop Build"
+            echo ""
+            if ls radar-desktop_*.zip 1>/dev/null 2>&1; then
+              echo "**Status:** Success"
+              ls -lh radar-desktop_*.zip | awk '{print "- `" $NF "` (" $5 ")"}'
+            else
+              echo "**Status:** Failed"
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
+
   build-windows:
     name: Windows (amd64)
     runs-on: windows-latest
@@ -148,6 +162,21 @@ jobs:
             radar-desktop_*.zip
             checksums-windows.txt
           retention-days: 1
+
+      - name: Build summary
+        if: always()
+        shell: bash
+        run: |
+          {
+            echo "## Windows Desktop Build"
+            echo ""
+            if ls radar-desktop_*.zip 1>/dev/null 2>&1; then
+              echo "**Status:** Success"
+              ls -lh radar-desktop_*.zip | awk '{print "- `" $NF "` (" $5 ")"}'
+            else
+              echo "**Status:** Failed"
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
 
   build-linux:
     name: Linux (amd64)
@@ -238,6 +267,20 @@ jobs:
             checksums-linux.txt
           retention-days: 1
 
+      - name: Build summary
+        if: always()
+        run: |
+          {
+            echo "## Linux Desktop Build"
+            echo ""
+            if ls radar-desktop_*.tar.gz 1>/dev/null 2>&1; then
+              echo "**Status:** Success"
+              ls -lh radar-desktop_*.tar.gz radar-desktop_*.deb radar-desktop_*.rpm 2>/dev/null | awk '{print "- `" $NF "` (" $5 ")"}'
+            else
+              echo "**Status:** Failed"
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
+
   publish:
     name: Publish Desktop Assets
     runs-on: ubuntu-latest
@@ -279,7 +322,29 @@ jobs:
             gh release upload "${{ github.ref_name }}" "$f" --repo "${{ github.repository }}" --clobber
           done
 
+      - name: Publish summary
+        run: |
+          VERSION="${GITHUB_REF_NAME}"
+          {
+            echo "## Desktop Release ${VERSION}"
+            echo ""
+            if [[ "$VERSION" == *-* ]]; then
+              echo "> **Pre-release** — Homebrew cask not updated"
+              echo ""
+            fi
+            echo "### Uploaded Assets"
+            echo '```'
+            ls -lh dist/radar-desktop_* dist/checksums-desktop.txt 2>/dev/null | awk '{print $NF, $5}'
+            echo '```'
+            echo ""
+            echo "### Checksums"
+            echo '```'
+            cat dist/checksums-desktop.txt 2>/dev/null || echo "not available"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
       - name: Update Homebrew cask
+        if: "!contains(github.ref_name, '-')"
         env:
           HOMEBREW_TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
         run: |
