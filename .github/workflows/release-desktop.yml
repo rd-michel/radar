@@ -60,6 +60,7 @@ jobs:
         run: |
           VERSION="${GITHUB_REF_NAME}"
           cd build/bin
+          mv radar-desktop.app Radar.app
           zip -r "../../radar-desktop_${VERSION}_darwin_universal.zip" Radar.app
           cd ../..
 
@@ -201,7 +202,9 @@ jobs:
               token: dummy' > ~/.kube/config
 
       - name: Build Linux binary
-        run: cd cmd/desktop && wails build -platform linux/amd64 -ldflags "-X main.version=${GITHUB_REF_NAME#v}"
+        run: |
+          cd cmd/desktop && wails build -platform linux/amd64 -ldflags "-X main.version=${GITHUB_REF_NAME#v}"
+          mv ../../build/bin/Radar ../../build/bin/radar-desktop
 
       - name: Create archive
         run: |
