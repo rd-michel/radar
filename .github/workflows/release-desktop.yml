@@ -34,7 +34,7 @@ jobs:
         run: make frontend embed
 
       - name: Build macOS .app (universal)
-        run: wails build -platform darwin/universal -ldflags "-X main.version=${GITHUB_REF_NAME#v}"
+        run: cd cmd/desktop && wails build -platform darwin/universal -ldflags "-X main.version=${GITHUB_REF_NAME#v}"
 
       - name: Create archive
         run: |
@@ -82,7 +82,7 @@ jobs:
         run: make frontend embed
 
       - name: Build Windows exe
-        run: wails build -platform windows/amd64 -ldflags "-X main.version=${GITHUB_REF_NAME#v}"
+        run: cd cmd/desktop && wails build -platform windows/amd64 -ldflags "-X main.version=${GITHUB_REF_NAME#v}"
 
       - name: Create archive
         shell: bash
@@ -109,7 +109,7 @@ jobs:
 
   build-linux:
     name: Linux (amd64)
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v6
 
@@ -140,7 +140,7 @@ jobs:
         run: make frontend embed
 
       - name: Build Linux binary
-        run: wails build -platform linux/amd64 -ldflags "-X main.version=${GITHUB_REF_NAME#v}"
+        run: cd cmd/desktop && wails build -platform linux/amd64 -ldflags "-X main.version=${GITHUB_REF_NAME#v}"
 
       - name: Create archive
         run: |
