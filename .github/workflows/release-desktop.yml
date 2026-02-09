@@ -226,25 +226,25 @@ jobs:
           git clone https://x-access-token:${HOMEBREW_TAP_TOKEN}@github.com/skyhook-io/homebrew-tap.git /tmp/homebrew-tap
           mkdir -p /tmp/homebrew-tap/Casks
 
-          cat > /tmp/homebrew-tap/Casks/radar-desktop.rb << 'CASK'
-cask "radar-desktop" do
-  version "VERSION_PLACEHOLDER"
-  sha256 "SHA256_PLACEHOLDER"
+          cat > /tmp/homebrew-tap/Casks/radar-desktop.rb <<'CASK'
+          cask "radar-desktop" do
+            version "VERSION_PLACEHOLDER"
+            sha256 "SHA256_PLACEHOLDER"
 
-  url "https://github.com/skyhook-io/radar/releases/download/v#{version}/radar-desktop_v#{version}_darwin_universal.zip"
-  name "Radar"
-  desc "Kubernetes visibility — topology, traffic, and Helm management"
-  homepage "https://github.com/skyhook-io/radar"
+            url "https://github.com/skyhook-io/radar/releases/download/v#{version}/radar-desktop_v#{version}_darwin_universal.zip"
+            name "Radar"
+            desc "Kubernetes visibility — topology, traffic, and Helm management"
+            homepage "https://github.com/skyhook-io/radar"
 
-  app "Radar.app"
+            app "Radar.app"
 
-  caveats <<~EOS
-    Radar Desktop is not yet code-signed. On first launch:
-      Right-click Radar.app → Open → click "Open"
-    Or install with: brew install --cask --no-quarantine radar-desktop
-  EOS
-end
-CASK
+            caveats <<~EOS
+              Radar Desktop is not yet code-signed. On first launch:
+                Right-click Radar.app → Open → click "Open"
+              Or install with: brew install --cask --no-quarantine radar-desktop
+            EOS
+          end
+          CASK
 
           sed -i "s/VERSION_PLACEHOLDER/${VERSION_NUM}/" /tmp/homebrew-tap/Casks/radar-desktop.rb
           sed -i "s/SHA256_PLACEHOLDER/${SHA256}/" /tmp/homebrew-tap/Casks/radar-desktop.rb
