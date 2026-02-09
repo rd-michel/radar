@@ -177,26 +177,26 @@ desktop-binary:
 	CGO_ENABLED=1 CGO_LDFLAGS="-framework UniformTypeIdentifiers" go build -tags production -ldflags "$(LDFLAGS)" -o radar-desktop ./cmd/desktop
 
 # Run desktop app in Wails dev mode with Go hot reload.
-# Uses -s to skip the frontend watcher — run `make watch-frontend` in a separate terminal.
+# wails.json lives in cmd/desktop/ (Wails requires it next to the main package).
 # Requires wails CLI: go install github.com/wailsapp/wails/v2/cmd/wails@latest
 desktop-dev:
 	@command -v wails >/dev/null 2>&1 || { echo "Error: wails CLI not found. Install with: go install github.com/wailsapp/wails/v2/cmd/wails@latest"; exit 1; }
-	wails dev -ldflags "$(LDFLAGS)" -s
+	cd cmd/desktop && wails dev -ldflags "$(LDFLAGS)"
 
 # Package macOS .app bundle
 desktop-package-darwin:
 	@command -v wails >/dev/null 2>&1 || { echo "Error: wails CLI not found"; exit 1; }
-	wails build -platform darwin/universal -ldflags "$(LDFLAGS)"
+	cd cmd/desktop && wails build -platform darwin/universal -ldflags "$(LDFLAGS)"
 
 # Package Windows .exe
 desktop-package-windows:
 	@command -v wails >/dev/null 2>&1 || { echo "Error: wails CLI not found"; exit 1; }
-	wails build -platform windows/amd64 -ldflags "$(LDFLAGS)"
+	cd cmd/desktop && wails build -platform windows/amd64 -ldflags "$(LDFLAGS)"
 
 # Package Linux binary
 desktop-package-linux:
 	@command -v wails >/dev/null 2>&1 || { echo "Error: wails CLI not found"; exit 1; }
-	wails build -platform linux/amd64 -ldflags "$(LDFLAGS)"
+	cd cmd/desktop && wails build -platform linux/amd64 -ldflags "$(LDFLAGS)"
 
 # ============================================================================
 # Release Targets
