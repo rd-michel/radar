@@ -33,6 +33,26 @@ jobs:
       - name: Build frontend
         run: make frontend embed
 
+      - name: Create dummy kubeconfig for Wails binding generation
+        run: |
+          mkdir -p ~/.kube
+          echo 'apiVersion: v1
+          kind: Config
+          clusters:
+          - cluster:
+              server: https://localhost:6443
+            name: dummy
+          contexts:
+          - context:
+              cluster: dummy
+              user: dummy
+            name: dummy
+          current-context: dummy
+          users:
+          - name: dummy
+            user:
+              token: dummy' > ~/.kube/config
+
       - name: Build macOS .app (universal)
         run: cd cmd/desktop && wails build -platform darwin/universal -ldflags "-X main.version=${GITHUB_REF_NAME#v}"
 
@@ -80,6 +100,27 @@ jobs:
 
       - name: Build frontend
         run: make frontend embed
+
+      - name: Create dummy kubeconfig for Wails binding generation
+        shell: bash
+        run: |
+          mkdir -p ~/.kube
+          echo 'apiVersion: v1
+          kind: Config
+          clusters:
+          - cluster:
+              server: https://localhost:6443
+            name: dummy
+          contexts:
+          - context:
+              cluster: dummy
+              user: dummy
+            name: dummy
+          current-context: dummy
+          users:
+          - name: dummy
+            user:
+              token: dummy' > ~/.kube/config
 
       - name: Build Windows exe
         run: cd cmd/desktop && wails build -platform windows/amd64 -ldflags "-X main.version=${GITHUB_REF_NAME#v}"
@@ -138,6 +179,26 @@ jobs:
 
       - name: Build frontend
         run: make frontend embed
+
+      - name: Create dummy kubeconfig for Wails binding generation
+        run: |
+          mkdir -p ~/.kube
+          echo 'apiVersion: v1
+          kind: Config
+          clusters:
+          - cluster:
+              server: https://localhost:6443
+            name: dummy
+          contexts:
+          - context:
+              cluster: dummy
+              user: dummy
+            name: dummy
+          current-context: dummy
+          users:
+          - name: dummy
+            user:
+              token: dummy' > ~/.kube/config
 
       - name: Build Linux binary
         run: cd cmd/desktop && wails build -platform linux/amd64 -ldflags "-X main.version=${GITHUB_REF_NAME#v}"
