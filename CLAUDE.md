@@ -34,43 +34,73 @@ Radar is a modern Kubernetes visibility tool — local-first, no account require
 
 ```
 radar/
-├── cmd/explorer/              # CLI entry point (main.go)
+├── cmd/
+│   ├── explorer/              # CLI entry point (main.go)
+│   └── desktop/               # Desktop app entry point (Tauri/Wails)
 ├── internal/
+│   ├── app/                   # Application lifecycle management
 │   ├── helm/                  # Helm client integration
 │   │   ├── client.go          # Helm SDK wrapper
 │   │   ├── handlers.go        # HTTP handlers for Helm operations
 │   │   └── types.go           # Helm release types
+│   ├── images/                # Container image analysis
 │   ├── k8s/
 │   │   ├── cache.go           # Typed informer caching
+│   │   ├── capabilities.go    # Cluster capability detection
 │   │   ├── client.go          # K8s client initialization
 │   │   ├── cluster_detection.go # GKE/EKS/AKS platform detection
+│   │   ├── connection_state.go  # Connection state tracking
+│   │   ├── context_manager.go   # Multi-context kubeconfig switching
 │   │   ├── discovery.go       # API resource discovery for CRDs
 │   │   ├── dynamic_cache.go   # CRD/dynamic resource support
+│   │   ├── ephemeral.go       # Ephemeral/debug containers
 │   │   ├── history.go         # Change history tracking
+│   │   ├── metrics.go         # Pod/node metrics collection
+│   │   ├── metrics_history.go # Metrics history tracking
+│   │   ├── subsystems.go      # Cache subsystem management
 │   │   └── update.go          # Resource update/delete operations
 │   ├── server/
 │   │   ├── server.go          # chi router, main REST endpoints
 │   │   ├── sse.go             # Server-Sent Events broadcaster
 │   │   ├── exec.go            # WebSocket pod terminal exec
 │   │   ├── logs.go            # Pod logs streaming
-│   │   └── portforward.go     # Port forwarding sessions
+│   │   ├── workload_logs.go   # Workload-level log aggregation
+│   │   ├── portforward.go     # Port forwarding sessions
+│   │   ├── dashboard.go       # Dashboard summary endpoint
+│   │   ├── argo_handlers.go   # ArgoCD sync/refresh/suspend handlers
+│   │   ├── flux_handlers.go   # FluxCD reconcile/suspend handlers
+│   │   ├── gitops_types.go    # Shared GitOps request/response types
+│   │   ├── traffic_handlers.go # Service mesh traffic flow handlers
+│   │   └── desktop_update.go  # Desktop app auto-update handlers
 │   ├── static/                # Embedded frontend files
-│   └── topology/
-│       ├── builder.go         # Topology graph construction
-│       ├── relationships.go   # Resource relationship detection
-│       └── types.go           # Node, edge, topology definitions
+│   ├── timeline/              # Timeline event storage (memory/SQLite)
+│   ├── topology/
+│   │   ├── builder.go         # Topology graph construction
+│   │   ├── pod_grouping.go    # Pod grouping/collapsing logic
+│   │   ├── relationships.go   # Resource relationship detection
+│   │   └── types.go           # Node, edge, topology definitions
+│   ├── traffic/               # Service mesh traffic analysis
+│   ├── updater/               # Binary self-update logic
+│   └── version/               # Version information
 ├── web/                       # React frontend (embedded at build)
 │   ├── src/
 │   │   ├── api/               # API client + SSE hooks
 │   │   ├── components/
 │   │   │   ├── dock/          # Bottom dock with terminal/logs tabs
-│   │   │   ├── timeline/      # Timeline view (activity & changes)
+│   │   │   ├── gitops/        # ArgoCD/FluxCD management panels
 │   │   │   ├── helm/          # Helm release management UI
+│   │   │   ├── home/          # Home/dashboard view
 │   │   │   ├── logs/          # Logs viewer component
 │   │   │   ├── portforward/   # Port forward manager
-│   │   │   ├── resources/     # Resource list/detail panels
+│   │   │   ├── resource/      # Single resource detail page
+│   │   │   ├── resource-drawer/ # Resource drawer overlay
+│   │   │   ├── resources/     # Resource list panels
+│   │   │   ├── timeline/      # Timeline view (activity & changes)
 │   │   │   ├── topology/      # Graph visualization
+│   │   │   ├── traffic/       # Traffic flow visualization
 │   │   │   └── ui/            # Base shadcn/ui components
+│   │   ├── contexts/          # React contexts (capabilities, theme, etc.)
+│   │   ├── hooks/             # Custom React hooks
 │   │   ├── types.ts           # TypeScript type definitions
 │   │   └── utils/             # Topology and utility functions
 │   └── package.json
@@ -152,9 +182,18 @@ make docker         # Build Docker image
 ### Core
 ```
 GET  /api/health                              # Health check with resource count
+GET  /api/version-check                       # Check for newer radar versions
+GET  /api/dashboard                           # Dashboard summary (counts, health)
+GET  /api/dashboard/crds                      # CRD summary for dashboard
 GET  /api/cluster-info                        # Platform detection (GKE, EKS, AKS, etc.)
+GET  /api/capabilities                        # Cluster capability flags
 GET  /api/namespaces                          # List all namespaces
 GET  /api/api-resources                       # API resource discovery for CRDs
+GET  /api/connection                          # Connection status
+POST /api/connection/retry                    # Retry failed connection
+GET  /api/contexts                            # List kubeconfig contexts
+POST /api/contexts/{name}                     # Switch kubeconfig context
+GET  /api/sessions                            # List active sessions
 ```
 
 ### Topology
@@ -188,6 +227,31 @@ GET  /api/changes/{kind}/{ns}/{name}/children # Child resource changes
 GET  /api/pods/{ns}/{name}/logs               # Fetch pod logs (non-streaming)
 GET  /api/pods/{ns}/{name}/logs/stream        # Stream pod logs via SSE
 GET  /api/pods/{ns}/{name}/exec               # WebSocket for pod terminal exec
+POST /api/pods/{ns}/{name}/debug              # Create ephemeral debug container
+```
+
+### Workload Operations
+```
+GET  /api/workloads/{kind}/{ns}/{name}/logs        # Aggregated logs across pods
+GET  /api/workloads/{kind}/{ns}/{name}/logs/stream # Stream aggregated workload logs
+GET  /api/workloads/{kind}/{ns}/{name}/pods        # List pods for a workload
+POST /api/workloads/{kind}/{ns}/{name}/restart     # Rolling restart workload
+POST /api/workloads/{kind}/{ns}/{name}/scale       # Scale workload replicas
+```
+
+### CronJob Operations
+```
+POST /api/cronjobs/{ns}/{name}/trigger        # Trigger manual job from CronJob
+POST /api/cronjobs/{ns}/{name}/suspend        # Suspend CronJob schedule
+POST /api/cronjobs/{ns}/{name}/resume         # Resume CronJob schedule
+```
+
+### Metrics
+```
+GET  /api/metrics/pods/{ns}/{name}            # Current pod metrics
+GET  /api/metrics/pods/{ns}/{name}/history    # Pod metrics history
+GET  /api/metrics/nodes/{name}                # Current node metrics
+GET  /api/metrics/nodes/{name}/history        # Node metrics history
 ```
 
 ### Port Forwarding
@@ -212,6 +276,34 @@ POST   /api/helm/releases/{ns}/{name}/upgrade      # Upgrade to new version
 DELETE /api/helm/releases/{ns}/{name}              # Uninstall release
 ```
 
+### GitOps — ArgoCD
+```
+POST /api/argo/applications/{ns}/{name}/sync      # Trigger ArgoCD sync
+POST /api/argo/applications/{ns}/{name}/refresh   # Refresh application state
+POST /api/argo/applications/{ns}/{name}/terminate # Terminate running sync
+POST /api/argo/applications/{ns}/{name}/suspend   # Suspend auto-sync
+POST /api/argo/applications/{ns}/{name}/resume    # Resume auto-sync
+```
+
+### GitOps — FluxCD
+```
+POST /api/flux/{kind}/{ns}/{name}/reconcile       # Trigger reconciliation
+POST /api/flux/{kind}/{ns}/{name}/sync-with-source # Reconcile with source update
+POST /api/flux/{kind}/{ns}/{name}/suspend         # Suspend reconciliation
+POST /api/flux/{kind}/{ns}/{name}/resume          # Resume reconciliation
+```
+
+### Traffic (Service Mesh)
+```
+GET  /api/traffic/sources                     # Available traffic data sources
+GET  /api/traffic/source                      # Active traffic source
+POST /api/traffic/source                      # Set active traffic source
+GET  /api/traffic/flows                       # Current traffic flows
+GET  /api/traffic/flows/stream                # SSE stream for traffic flows
+POST /api/traffic/connect                     # Connect to traffic source
+GET  /api/traffic/connection                  # Traffic connection status
+```
+
 ## Key Patterns
 
 ### K8s Caching
@@ -219,7 +311,7 @@ DELETE /api/helm/releases/{ns}/{name}              # Uninstall release
 - Dynamic caching for CRDs and custom resource types via API discovery
 - Memory-efficient with field stripping (removes managed fields, last-applied annotations)
 - Change notifications via channel for real-time SSE updates
-- Supports: Pods, Services, Deployments, DaemonSets, StatefulSets, ReplicaSets, Ingresses, ConfigMaps, Secrets, Events, Jobs, CronJobs, HPAs, PVCs, Nodes, Namespaces
+- Supports: Pods, Services, Deployments, DaemonSets, StatefulSets, ReplicaSets, Ingresses, ConfigMaps, Secrets, Events, Jobs, CronJobs, HorizontalPodAutoscalers, PersistentVolumeClaims, Nodes, Namespaces
 
 ### Server-Sent Events (SSE)
 - Central `SSEBroadcaster` manages connected clients
@@ -239,12 +331,12 @@ DELETE /api/helm/releases/{ns}/{name}              # Uninstall release
 - Owner reference traversal for parent-child relationships
 - Selector-based matching for Service→Pod, Deployment→ReplicaSet
 - Two view modes:
-  - `traffic`: Network flow (Ingress → Service → Pod)
+  - `traffic`: Network flow (Ingress/Gateway → HTTPRoute → Service → Pod)
   - `resources`: Full hierarchy (Deployment → ReplicaSet → Pod)
-- Node types: Ingress, Service, Deployment, DaemonSet, StatefulSet, ReplicaSet, Pod, Job, CronJob, ConfigMap, Secret, HPA, PVC
+- Node types: Ingress, Gateway, HTTPRoute, GRPCRoute, TCPRoute, TLSRoute, Service, Deployment, DaemonSet, StatefulSet, ReplicaSet, Pod, Job, CronJob, ConfigMap, Secret, HorizontalPodAutoscaler, PersistentVolumeClaim
 - GitOps nodes: Application (ArgoCD), Kustomization, HelmRelease, GitRepository (FluxCD)
   - Connected to managed resources via status.resources (ArgoCD) or status.inventory (FluxCD Kustomization)
-  - HelmRelease connects to resources via FluxCD labels (`helm.toolkit.fluxcd.io/name`) or standard Helm label (`app.kubernetes.io/instance`)
+  - HelmRelease connects to resources via FluxCD labels (`helm.toolkit.fluxcd.io/name`) or standard Helm label (`app.kubernetes.io/instance`). Matches Deployment, Service, StatefulSet, DaemonSet, Job, CronJob, Rollout.
   - **Single-cluster limitation**: Radar only shows connections when GitOps controller and managed resources are in the same cluster. ArgoCD commonly deploys to remote clusters (hub-spoke model), so Application→resource edges won't appear when connected to the ArgoCD cluster. FluxCD typically deploys to its own cluster, so connections usually work.
 
 ### Timeline
@@ -255,7 +347,7 @@ DELETE /api/helm/releases/{ns}/{name}              # Uninstall release
 
 ### Resource Relationships
 - Computed at query time for resource detail views
-- Tracks: parent (owner), children (owned), config (ConfigMaps/Secrets), network (Services/Ingresses)
+- Tracks: parent (owner), children (owned), config (ConfigMaps/Secrets), network (Services/Ingresses/Gateways/Routes)
 - Used for topology edges and change propagation
 
 ### Error Handling (Backend)
