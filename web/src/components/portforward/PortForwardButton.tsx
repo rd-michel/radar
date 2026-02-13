@@ -286,14 +286,13 @@ export function PortForwardButton({
                 onClick={() => handlePortSelect(port)}
                 className="w-full px-3 py-2 text-left text-sm text-theme-text-primary hover:bg-theme-elevated flex items-center justify-between"
               >
-                <span className="flex items-center gap-2">
+                <span className="flex items-center gap-2 shrink-0">
                   <code className="text-accent-text">{port.port}</code>
                   <span className="text-theme-text-disabled">/{port.protocol || 'TCP'}</span>
                 </span>
-                <span className="text-xs text-theme-text-disabled">
-                  {port.name && <span className="mr-2">{port.name}</span>}
-                  {port.containerName && <span className="text-theme-text-tertiary">{port.containerName}</span>}
-                </span>
+                {port.name && (
+                  <span className="text-xs text-theme-text-disabled truncate max-w-[120px]">{port.name}</span>
+                )}
               </button>
             ))}
           </div>
