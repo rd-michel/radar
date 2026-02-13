@@ -150,7 +150,7 @@ export function TerminalTab({
     }
 
     ws.onerror = () => {
-      setError('Connection error')
+      setError((prev) => prev || 'Connection error')
       setIsConnected(false)
       setIsConnecting(false)
     }
@@ -313,9 +313,9 @@ export function TerminalTab({
         )}
       </div>
 
-      {/* Terminal or error */}
+      {/* Terminal or error — keys force React to unmount/remount so xterm canvas is removed */}
       {error ? (
-        <div className="absolute top-8 left-0 right-0 bottom-0 flex flex-col items-center justify-center p-4 text-center">
+        <div key="error" className="absolute top-8 left-0 right-0 bottom-0 flex flex-col items-center justify-center p-4 text-center bg-slate-900">
           {errorType === 'shell_not_found' ? (
             <>
               <div className="text-amber-400 mb-2 text-sm">Shell not available</div>
@@ -365,7 +365,7 @@ export function TerminalTab({
           )}
         </div>
       ) : (
-        <div ref={terminalRef} className="absolute top-8 left-0 right-0 bottom-0" />
+        <div key="terminal" ref={terminalRef} className="absolute top-8 left-0 right-0 bottom-0" />
       )}
     </div>
   )

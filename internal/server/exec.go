@@ -248,19 +248,19 @@ func (s *Server) handlePodExec(w http.ResponseWriter, r *http.Request) {
 				log.Printf("Exec failed (%s): %v", errorType, err)
 				sendWSErrorWithType(conn, errorType, errMsg)
 			}
-			// Close connection to unblock reader goroutine
+			// Give browser time to process the error message before closing.
+			// Without this delay, conn.Close() tears down TCP before the
+			// browser's onmessage fires, so the error never reaches the UI.
+			time.Sleep(200 * time.Millisecond)
 			conn.Close()
 		case <-r.Context().Done():
 			conn.Close()
 		}
 	}()
 
-	// Main loop - process messages until exec finishes or read error
+	// Main loop - process messages until read error (watcher handles exec completion)
 	for {
 		select {
-		case <-execDone:
-			// Exec finished, exit loop
-			goto cleanup
 		case err := <-readErrChan:
 			// WebSocket read error
 			if !websocket.IsCloseError(err, websocket.CloseNormalClosure, websocket.CloseGoingAway) {
@@ -312,8 +312,14 @@ func sendWSErrorWithType(conn *websocket.Conn, errorType, msg string) {
 		ErrorType: errorType,
 		Data:      msg,
 	}
-	data, _ := json.Marshal(errMsg)
-	conn.WriteMessage(websocket.TextMessage, data)
+	data, err := json.Marshal(errMsg)
+	if err != nil {
+		log.Printf("[exec] Failed to marshal error message: %v", err)
+		return
+	}
+	if err := conn.WriteMessage(websocket.TextMessage, data); err != nil {
+		log.Printf("[exec] Failed to send error to client (%s: %s): %v", errorType, msg, err)
+	}
 }
 
 // isShellNotFoundError detects errors indicating the shell binary is missing
