@@ -16,6 +16,8 @@ import (
 	"github.com/go-chi/chi/v5"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/tools/portforward"
 	"k8s.io/client-go/transport/spdy"
@@ -121,19 +123,21 @@ func (s *Server) handleStartPortForward(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	// If service name provided, find a pod backing it
+	// If service name provided, find a pod backing it and resolve the target port
 	podName := req.PodName
+	podPort := req.PodPort
 	if req.ServiceName != "" && podName == "" {
-		foundPod, err := findPodForService(r.Context(), req.Namespace, req.ServiceName, req.PodPort)
+		foundPod, containerPort, err := findPodForService(r.Context(), req.Namespace, req.ServiceName, req.PodPort)
 		if err != nil {
 			s.writeError(w, http.StatusNotFound, fmt.Sprintf("No pod found for service %s: %v", req.ServiceName, err))
 			return
 		}
 		podName = foundPod
+		podPort = containerPort
 	}
 
 	// Validate that the pod actually exposes this port
-	if err := validatePodPort(r.Context(), req.Namespace, podName, req.PodPort); err != nil {
+	if err := validatePodPort(r.Context(), req.Namespace, podName, podPort); err != nil {
 		s.writeError(w, http.StatusBadRequest, err.Error())
 		return
 	}
@@ -175,7 +179,7 @@ func (s *Server) handleStartPortForward(w http.ResponseWriter, r *http.Request) 
 		ID:            sessionID,
 		Namespace:     req.Namespace,
 		PodName:       podName,
-		PodPort:       req.PodPort,
+		PodPort:       podPort,
 		LocalPort:     localPort,
 		ListenAddress: listenAddr,
 		ServiceName:   req.ServiceName,
@@ -211,16 +215,17 @@ func (s *Server) handleStartPortForward(w http.ResponseWriter, r *http.Request) 
 	// Wait briefly for port forward to start
 	time.Sleep(100 * time.Millisecond)
 
-	pfManager.mu.RLock()
+	pfManager.mu.Lock()
 	session = pfManager.sessions[sessionID]
-	pfManager.mu.RUnlock()
-
 	if session.Status == "error" {
-		s.writeError(w, http.StatusInternalServerError, session.Error)
+		errMsg := session.Error
+		pfManager.mu.Unlock()
+		s.writeError(w, http.StatusInternalServerError, errMsg)
 		return
 	}
-
 	session.Status = "running"
+	pfManager.mu.Unlock()
+
 	s.writeJSON(w, session)
 }
 
@@ -309,62 +314,100 @@ func runPortForward(ctx context.Context, session *PortForwardSession) error {
 	}
 }
 
-func findPodForService(ctx context.Context, namespace, serviceName string, targetPort int) (string, error) {
+// findPodForService resolves a service port to a backing pod and the container target port.
+// It returns the pod name and the resolved container port to forward to.
+// This follows the same resolution logic as kubectl port-forward:
+//   - Headless services (ClusterIP=None): use the service port directly
+//   - Integer targetPort: use the targetPort value (defaults to service port if unset)
+//   - Named targetPort: look up the container port by name from the pod spec
+func findPodForService(ctx context.Context, namespace, serviceName string, servicePort int) (string, int, error) {
 	client := k8s.GetClient()
 
 	// Get service
 	svc, err := client.CoreV1().Services(namespace).Get(ctx, serviceName, metav1.GetOptions{})
 	if err != nil {
-		return "", fmt.Errorf("failed to get service: %w", err)
+		return "", 0, fmt.Errorf("failed to get service: %w", err)
 	}
 
-	if svc.Spec.Selector == nil || len(svc.Spec.Selector) == 0 {
-		return "", fmt.Errorf("service has no selector")
+	if len(svc.Spec.Selector) == 0 {
+		return "", 0, fmt.Errorf("service has no selector")
 	}
 
-	// Validate that the service has this port
-	portFound := false
+	// Find the matching service port entry
+	var targetPort intstr.IntOrString
+	found := false
 	for _, port := range svc.Spec.Ports {
-		if int(port.Port) == targetPort || int(port.TargetPort.IntVal) == targetPort {
-			portFound = true
+		if int(port.Port) == servicePort {
+			targetPort = port.TargetPort
+			found = true
 			break
 		}
 	}
-	if !portFound {
-		return "", fmt.Errorf("service does not expose port %d", targetPort)
-	}
-
-	// Build label selector
-	var selector string
-	for k, v := range svc.Spec.Selector {
-		if selector != "" {
-			selector += ","
-		}
-		selector += k + "=" + v
+	if !found {
+		return "", 0, fmt.Errorf("service does not expose port %d", servicePort)
 	}
 
 	// Find pods matching selector
 	pods, err := client.CoreV1().Pods(namespace).List(ctx, metav1.ListOptions{
-		LabelSelector: selector,
+		LabelSelector: labels.Set(svc.Spec.Selector).String(),
 	})
 	if err != nil {
-		return "", fmt.Errorf("failed to list pods: %w", err)
+		return "", 0, fmt.Errorf("failed to list pods: %w", err)
 	}
 
 	if len(pods.Items) == 0 {
-		return "", fmt.Errorf("no pods found matching selector")
+		return "", 0, fmt.Errorf("no pods found matching selector")
 	}
 
-	// Return first running pod that has the port
+	// Headless services (ClusterIP=None) skip targetPort resolution (matches kubectl behavior)
+	if svc.Spec.ClusterIP == corev1.ClusterIPNone {
+		for _, pod := range pods.Items {
+			if pod.Status.Phase == corev1.PodRunning {
+				return pod.Name, servicePort, nil
+			}
+		}
+		return "", 0, fmt.Errorf("no running pod found")
+	}
+
+	// Named targetPort: resolve against running pods by looking up container port names
+	if targetPort.Type == intstr.String && targetPort.StrVal != "" {
+		for _, pod := range pods.Items {
+			if pod.Status.Phase == corev1.PodRunning {
+				if resolved, ok := resolveNamedPort(&pod, targetPort.StrVal); ok {
+					return pod.Name, resolved, nil
+				}
+			}
+		}
+		return "", 0, fmt.Errorf("no running pod found with named port %q", targetPort.StrVal)
+	}
+
+	// Numeric targetPort: use the value, or default to the service port if unset
+	containerPort := servicePort
+	if targetPort.IntVal > 0 {
+		containerPort = int(targetPort.IntVal)
+	}
+
 	for _, pod := range pods.Items {
 		if pod.Status.Phase == corev1.PodRunning {
-			if podHasPort(&pod, targetPort) {
-				return pod.Name, nil
+			if podHasPort(&pod, containerPort) {
+				return pod.Name, containerPort, nil
 			}
 		}
 	}
 
-	return "", fmt.Errorf("no running pod found with port %d", targetPort)
+	return "", 0, fmt.Errorf("no running pod found with port %d", containerPort)
+}
+
+// resolveNamedPort looks up a named port in a pod's containers and returns the container port number.
+func resolveNamedPort(pod *corev1.Pod, portName string) (int, bool) {
+	for _, container := range pod.Spec.Containers {
+		for _, p := range container.Ports {
+			if p.Name == portName {
+				return int(p.ContainerPort), true
+			}
+		}
+	}
+	return 0, false
 }
 
 // validatePodPort checks if the pod actually exposes the requested port
@@ -489,7 +532,9 @@ func (s *Server) handleGetAvailablePorts(w http.ResponseWriter, r *http.Request)
 				Name:     p.Name,
 			}
 			// If targetPort is different, note it
-			if p.TargetPort.IntVal > 0 && int(p.TargetPort.IntVal) != int(p.Port) {
+			if p.TargetPort.Type == intstr.String && p.TargetPort.StrVal != "" {
+				port.Name = fmt.Sprintf("%s (-> %s)", p.Name, p.TargetPort.StrVal)
+			} else if p.TargetPort.IntVal > 0 && int(p.TargetPort.IntVal) != int(p.Port) {
 				port.Name = fmt.Sprintf("%s (-> %d)", p.Name, p.TargetPort.IntVal)
 			}
 			ports = append(ports, port)
