@@ -2,6 +2,7 @@ package timeline
 
 import (
 	"context"
+	"slices"
 	"sync"
 	"time"
 )
@@ -297,39 +298,21 @@ func (m *MemoryStore) matchesFilters(event *TimelineEvent, opts QueryOptions, cf
 	}
 
 	if len(opts.Namespaces) > 0 {
-		found := false
-		for _, ns := range opts.Namespaces {
-			if event.Namespace == ns {
-				found = true
-				break
-			}
-		}
+		found := slices.Contains(opts.Namespaces, event.Namespace)
 		if !found {
 			return false
 		}
 	}
 
 	if len(opts.Kinds) > 0 {
-		found := false
-		for _, k := range opts.Kinds {
-			if event.Kind == k {
-				found = true
-				break
-			}
-		}
+		found := slices.Contains(opts.Kinds, event.Kind)
 		if !found {
 			return false
 		}
 	}
 
 	if len(opts.Sources) > 0 {
-		found := false
-		for _, s := range opts.Sources {
-			if event.Source == s {
-				found = true
-				break
-			}
-		}
+		found := slices.Contains(opts.Sources, event.Source)
 		if !found {
 			return false
 		}

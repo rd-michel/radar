@@ -70,19 +70,19 @@ func ComputeDiff(kind string, oldObj, newObj any) *DiffInfo {
 		return nil
 	}
 
-	summary := ""
+	var summary strings.Builder
 	if len(summaryParts) > 0 {
 		for i, part := range summaryParts {
 			if i > 0 {
-				summary += ", "
+				summary.WriteString(", ")
 			}
-			summary += part
+			summary.WriteString(part)
 		}
 	}
 
 	return &DiffInfo{
 		Fields:  changes,
-		Summary: summary,
+		Summary: summary.String(),
 	}
 }
 
@@ -1506,9 +1506,9 @@ func getFluxConditionStatus(status map[string]any, conditionType string) string 
 // truncateSourceRevision truncates a source revision (may include branch@sha format)
 func truncateSourceRevision(rev string) string {
 	// Handle "branch@sha:commit" format from FluxCD
-	if idx := strings.Index(rev, "@"); idx != -1 {
-		branch := rev[:idx]
-		rest := rev[idx+1:]
+	if before, after, ok := strings.Cut(rev, "@"); ok {
+		branch := before
+		rest := after
 		// Truncate the SHA part
 		if colonIdx := strings.Index(rest, ":"); colonIdx != -1 {
 			sha := rest[colonIdx+1:]
@@ -1666,11 +1666,12 @@ func joinStrings(parts []string, sep string) string {
 	if len(parts) == 0 {
 		return ""
 	}
-	result := parts[0]
+	var result strings.Builder
+	result.WriteString(parts[0])
 	for i := 1; i < len(parts); i++ {
-		result += sep + parts[i]
+		result.WriteString(sep + parts[i])
 	}
-	return result
+	return result.String()
 }
 
 // extractPrimaryIssue extracts the primary issue from a diff summary string

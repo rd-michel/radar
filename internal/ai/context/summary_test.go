@@ -34,7 +34,7 @@ func withPhase(phase corev1.PodPhase) podOption {
 func withReadyContainers(ready, total int) podOption {
 	return func(p *corev1.Pod) {
 		p.Status.ContainerStatuses = make([]corev1.ContainerStatus, total)
-		for i := 0; i < total; i++ {
+		for i := range total {
 			p.Status.ContainerStatuses[i] = corev1.ContainerStatus{
 				Name:  "app",
 				Ready: i < ready,
@@ -151,11 +151,11 @@ func makeDaemonSet(name string, ready, desired int32) *appsv1.DaemonSet {
 
 func TestSummary_PodStatus(t *testing.T) {
 	tests := []struct {
-		name        string
-		pod         *corev1.Pod
-		wantStatus  string
-		wantIssue   string
-		wantReady   string
+		name       string
+		pod        *corev1.Pod
+		wantStatus string
+		wantIssue  string
+		wantReady  string
 	}{
 		{
 			name:       "running healthy",
@@ -560,4 +560,5 @@ func TestSummary_CronJob(t *testing.T) {
 	}
 }
 
-func int32Ptr(i int32) *int32 { return &i }
+//go:fix inline
+func int32Ptr(i int32) *int32 { return new(i) }

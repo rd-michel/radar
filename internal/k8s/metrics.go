@@ -18,9 +18,9 @@ type PodMetrics struct {
 
 // NodeMetrics represents metrics for a single node
 type NodeMetrics struct {
-	Metadata  MetricsMeta  `json:"metadata"`
-	Timestamp string       `json:"timestamp"`
-	Window    string       `json:"window"`
+	Metadata  MetricsMeta   `json:"metadata"`
+	Timestamp string        `json:"timestamp"`
+	Window    string        `json:"window"`
 	Usage     ResourceUsage `json:"usage"`
 }
 
@@ -72,7 +72,7 @@ func GetPodMetrics(ctx context.Context, namespace, name string) (*PodMetrics, er
 	metrics := &PodMetrics{}
 
 	// Extract metadata
-	if meta, ok := result.Object["metadata"].(map[string]interface{}); ok {
+	if meta, ok := result.Object["metadata"].(map[string]any); ok {
 		metrics.Metadata.Name, _ = meta["name"].(string)
 		metrics.Metadata.Namespace, _ = meta["namespace"].(string)
 		metrics.Metadata.CreationTimestamp, _ = meta["creationTimestamp"].(string)
@@ -83,12 +83,12 @@ func GetPodMetrics(ctx context.Context, namespace, name string) (*PodMetrics, er
 	metrics.Window, _ = result.Object["window"].(string)
 
 	// Extract containers
-	if containers, ok := result.Object["containers"].([]interface{}); ok {
+	if containers, ok := result.Object["containers"].([]any); ok {
 		for _, c := range containers {
-			if container, ok := c.(map[string]interface{}); ok {
+			if container, ok := c.(map[string]any); ok {
 				cm := ContainerMetrics{}
 				cm.Name, _ = container["name"].(string)
-				if usage, ok := container["usage"].(map[string]interface{}); ok {
+				if usage, ok := container["usage"].(map[string]any); ok {
 					cm.Usage.CPU, _ = usage["cpu"].(string)
 					cm.Usage.Memory, _ = usage["memory"].(string)
 				}
@@ -116,7 +116,7 @@ func GetNodeMetrics(ctx context.Context, name string) (*NodeMetrics, error) {
 	metrics := &NodeMetrics{}
 
 	// Extract metadata
-	if meta, ok := result.Object["metadata"].(map[string]interface{}); ok {
+	if meta, ok := result.Object["metadata"].(map[string]any); ok {
 		metrics.Metadata.Name, _ = meta["name"].(string)
 		metrics.Metadata.CreationTimestamp, _ = meta["creationTimestamp"].(string)
 	}
@@ -126,7 +126,7 @@ func GetNodeMetrics(ctx context.Context, name string) (*NodeMetrics, error) {
 	metrics.Window, _ = result.Object["window"].(string)
 
 	// Extract usage
-	if usage, ok := result.Object["usage"].(map[string]interface{}); ok {
+	if usage, ok := result.Object["usage"].(map[string]any); ok {
 		metrics.Usage.CPU, _ = usage["cpu"].(string)
 		metrics.Usage.Memory, _ = usage["memory"].(string)
 	}

@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"maps"
 	"net/http"
 	"sort"
 	"strings"
@@ -297,9 +298,7 @@ func (b *SSEBroadcaster) watchResourceChanges() {
 func (b *SSEBroadcaster) broadcastTopologyUpdate() {
 	b.mu.RLock()
 	clients := make(map[chan SSEEvent]ClientInfo, len(b.clients))
-	for ch, info := range b.clients {
-		clients[ch] = info
-	}
+	maps.Copy(clients, b.clients)
 	b.mu.RUnlock()
 
 	log.Printf("Broadcasting topology update to %d clients", len(clients))

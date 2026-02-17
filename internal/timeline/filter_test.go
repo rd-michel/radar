@@ -1,6 +1,7 @@
 package timeline
 
 import (
+	"slices"
 	"testing"
 	"time"
 )
@@ -204,13 +205,7 @@ func TestDefaultFilterPreset(t *testing.T) {
 	// Verify it excludes expected kinds
 	expectedExcluded := []string{"Lease", "Endpoints", "EndpointSlice"}
 	for _, kind := range expectedExcluded {
-		found := false
-		for _, k := range defaultPreset.ExcludeKinds {
-			if k == kind {
-				found = true
-				break
-			}
-		}
+		found := slices.Contains(defaultPreset.ExcludeKinds, kind)
 		if !found {
 			t.Errorf("default preset should exclude %s", kind)
 		}

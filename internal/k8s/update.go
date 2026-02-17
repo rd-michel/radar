@@ -188,17 +188,17 @@ func TriggerCronJob(ctx context.Context, namespace, name string) (*unstructured.
 
 	// Build the Job object
 	job := &unstructured.Unstructured{
-		Object: map[string]interface{}{
+		Object: map[string]any{
 			"apiVersion": "batch/v1",
 			"kind":       "Job",
-			"metadata": map[string]interface{}{
+			"metadata": map[string]any{
 				"name":      jobName,
 				"namespace": namespace,
-				"annotations": map[string]interface{}{
+				"annotations": map[string]any{
 					"cronjob.kubernetes.io/instantiate": "manual",
 				},
-				"ownerReferences": []interface{}{
-					map[string]interface{}{
+				"ownerReferences": []any{
+					map[string]any{
 						"apiVersion":         cronJob.GetAPIVersion(),
 						"kind":               cronJob.GetKind(),
 						"name":               cronJob.GetName(),

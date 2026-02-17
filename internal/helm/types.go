@@ -123,7 +123,7 @@ type ValuesPreviewResponse struct {
 type HelmRepository struct {
 	Name        string    `json:"name"`
 	URL         string    `json:"url"`
-	LastUpdated time.Time `json:"lastUpdated,omitempty"`
+	LastUpdated time.Time `json:"lastUpdated"`
 }
 
 // ChartInfo contains basic information about a Helm chart

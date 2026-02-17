@@ -19,9 +19,9 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/go-chi/cors"
+	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/labels"
-	corev1 "k8s.io/api/core/v1"
 
 	"github.com/skyhook-io/radar/internal/helm"
 	"github.com/skyhook-io/radar/internal/images"
@@ -363,7 +363,7 @@ func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {
 	if dynCache := k8s.GetDynamicResourceCache(); dynCache != nil {
 		dynamicInformerCount = dynCache.GetInformerCount()
 	}
-	runtimeStats["typedInformers"] = 16  // Fixed count of typed informers in cache.go
+	runtimeStats["typedInformers"] = 16 // Fixed count of typed informers in cache.go
 	runtimeStats["dynamicInformers"] = dynamicInformerCount
 
 	s.writeJSON(w, map[string]any{
@@ -1289,7 +1289,7 @@ func (s *Server) handleTriggerCronJob(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	s.writeJSON(w, map[string]interface{}{
+	s.writeJSON(w, map[string]any{
 		"message": "Job created successfully",
 		"jobName": result.GetName(),
 	})

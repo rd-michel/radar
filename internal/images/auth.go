@@ -5,6 +5,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"log"
+	"maps"
 	"strings"
 
 	"github.com/google/go-containerregistry/pkg/authn"
@@ -97,7 +98,7 @@ func getServiceAccountPullSecrets(namespace, saName string) []string {
 
 	var secrets []string
 	for _, ps := range pullSecrets {
-		if psMap, ok := ps.(map[string]interface{}); ok {
+		if psMap, ok := ps.(map[string]any); ok {
 			if name, ok := psMap["name"].(string); ok && name != "" {
 				secrets = append(secrets, name)
 			}
@@ -111,14 +112,14 @@ func getServiceAccountPullSecrets(namespace, saName string) []string {
 type RegistryType string
 
 const (
-	RegistryDocker  RegistryType = "docker"   // Docker Hub
-	RegistryGoogle  RegistryType = "google"   // GCR, Artifact Registry
-	RegistryAWS     RegistryType = "aws"      // ECR
-	RegistryAzure   RegistryType = "azure"    // ACR
-	RegistryGitHub  RegistryType = "github"   // GHCR
-	RegistryQuay    RegistryType = "quay"     // Quay.io
-	RegistryGitLab  RegistryType = "gitlab"   // GitLab Container Registry
-	RegistryGeneric RegistryType = "generic"  // Unknown/other registries
+	RegistryDocker  RegistryType = "docker"  // Docker Hub
+	RegistryGoogle  RegistryType = "google"  // GCR, Artifact Registry
+	RegistryAWS     RegistryType = "aws"     // ECR
+	RegistryAzure   RegistryType = "azure"   // ACR
+	RegistryGitHub  RegistryType = "github"  // GHCR
+	RegistryQuay    RegistryType = "quay"    // Quay.io
+	RegistryGitLab  RegistryType = "gitlab"  // GitLab Container Registry
+	RegistryGeneric RegistryType = "generic" // Unknown/other registries
 )
 
 // DetectRegistryType determines the registry type from an image reference
@@ -196,8 +197,8 @@ func GetAuthenticatedKeychain(imageRef string, namespace string, secretNames []s
 	case RegistryGoogle:
 		log.Printf("Adding Google keychain for registry: %s", imageRef)
 		keychains = append(keychains, google.Keychain)
-	// AWS, Azure, GitHub, Quay, GitLab all use docker config.json credentials
-	// which are handled by the default keychain
+		// AWS, Azure, GitHub, Quay, GitLab all use docker config.json credentials
+		// which are handled by the default keychain
 	}
 
 	// 3. Add default keychain as fallback (reads ~/.docker/config.json)
@@ -247,9 +248,7 @@ func getKeychainFromSecrets(namespace string, secretNames []string) authn.Keycha
 			continue
 		}
 
-		for registry, entry := range config.Auths {
-			auths[registry] = entry
-		}
+		maps.Copy(auths, config.Auths)
 	}
 
 	if len(auths) == 0 {

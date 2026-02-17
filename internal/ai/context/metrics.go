@@ -100,7 +100,7 @@ func describeTrend(dataPoints []MetricsDataPoint) string {
 
 	// Compare average of last 3 vs first 3
 	var recentCPU, recentMem, earlyMem, earlyCPU int64
-	for i := 0; i < 3; i++ {
+	for i := range 3 {
 		earlyCPU += dataPoints[i].CPU
 		earlyMem += dataPoints[i].Memory
 		recentCPU += dataPoints[n-1-i].CPU

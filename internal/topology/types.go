@@ -1,5 +1,7 @@
 package topology
 
+import "slices"
+
 // NodeKind represents the type of a topology node
 //
 // When adding a new NodeKind constant, also update:
@@ -124,12 +126,7 @@ func MatchesNamespace(namespaces []string, ns string) bool {
 	if len(namespaces) == 0 {
 		return true
 	}
-	for _, allowed := range namespaces {
-		if allowed == ns {
-			return true
-		}
-	}
-	return false
+	return slices.Contains(namespaces, ns)
 }
 
 // MatchesNamespaceFilter returns true if the given namespace matches the filter.
@@ -154,7 +151,7 @@ func DefaultBuildOptions() BuildOptions {
 		Namespaces:         nil, // Empty = all namespaces
 		ViewMode:           ViewModeResources,
 		MaxIndividualPods:  5,
-		MaxNodes:           2000, // Limit to prevent browser crashes on large clusters
+		MaxNodes:           2000,  // Limit to prevent browser crashes on large clusters
 		IncludeSecrets:     false, // Secrets are sensitive
 		IncludeConfigMaps:  true,
 		IncludePVCs:        true,

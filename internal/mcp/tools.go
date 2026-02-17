@@ -381,8 +381,8 @@ type mcpWarning struct {
 }
 
 type mcpHelmSummary struct {
-	Total    int                `json:"total"`
-	Releases []mcpHelmRelease  `json:"releases,omitempty"`
+	Total    int              `json:"total"`
+	Releases []mcpHelmRelease `json:"releases,omitempty"`
 }
 
 type mcpHelmRelease struct {
@@ -508,15 +508,9 @@ func buildDashboard(ctx context.Context, cache *k8s.ResourceCache, namespace str
 			}
 			return ti.After(tj)
 		})
-		limit := 5
-		if len(warnings) < limit {
-			limit = len(warnings)
-		}
+		limit := min(len(warnings), 5)
 		for _, e := range warnings[:limit] {
-			count := int(e.Count)
-			if count < 1 {
-				count = 1
-			}
+			count := max(int(e.Count), 1)
 			d.TopWarnings = append(d.TopWarnings, mcpWarning{
 				Reason:  e.Reason,
 				Message: truncate(e.Message, 200),
@@ -530,10 +524,7 @@ func buildDashboard(ctx context.Context, cache *k8s.ResourceCache, namespace str
 		releases, err := helmClient.ListReleases(namespace)
 		if err == nil {
 			d.HelmReleases.Total = len(releases)
-			limit := 5
-			if len(releases) < limit {
-				limit = len(releases)
-			}
+			limit := min(len(releases), 5)
 			for _, r := range releases[:limit] {
 				d.HelmReleases.Releases = append(d.HelmReleases.Releases, mcpHelmRelease{
 					Name:      r.Name,

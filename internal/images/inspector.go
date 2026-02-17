@@ -21,11 +21,11 @@ import (
 )
 
 const (
-	maxFileCount       = 50000             // Safety limit for file count
-	maxTotalSize       = 5 << 30           // 5GB safety limit
-	layerCacheTTL      = 5 * time.Minute   // TTL for cached layers on disk
-	maxCachedImages    = 5                 // Max number of images to cache on disk
-	cacheSubdir        = "radar-image-cache"
+	maxFileCount    = 50000           // Safety limit for file count
+	maxTotalSize    = 5 << 30         // 5GB safety limit
+	layerCacheTTL   = 5 * time.Minute // TTL for cached layers on disk
+	maxCachedImages = 5               // Max number of images to cache on disk
+	cacheSubdir     = "radar-image-cache"
 )
 
 // layerCacheMetadata stores metadata about cached image layers
@@ -300,7 +300,7 @@ func (i *Inspector) evictOldEntries() error {
 		})
 		// Remove oldest entries to make room
 		toRemove := len(cached) - maxCachedImages + 1
-		for idx := 0; idx < toRemove; idx++ {
+		for idx := range toRemove {
 			path := filepath.Join(i.cacheDir, cached[idx].name)
 			os.RemoveAll(path)
 			log.Printf("Evicted oldest cached image: %s", cached[idx].name)
@@ -522,8 +522,8 @@ func buildFilesystemTreeFromFiles(ctx context.Context, layerPaths []string) (*Fi
 			name := filepath.Base(path)
 
 			// Handle whiteout files (deletions in OCI layers)
-			if strings.HasPrefix(name, ".wh.") {
-				deletedName := strings.TrimPrefix(name, ".wh.")
+			if after, ok := strings.CutPrefix(name, ".wh."); ok {
+				deletedName := after
 				deletedPath := filepath.Join(filepath.Dir(path), deletedName)
 				deleteFromTree(fileMap, deletedPath)
 				continue
@@ -708,8 +708,8 @@ func readFileFromCachedLayers(ctx context.Context, layerPaths []string, filePath
 			name := filepath.Base(path)
 
 			// Check for whiteout (deletion)
-			if strings.HasPrefix(name, ".wh.") {
-				deletedName := strings.TrimPrefix(name, ".wh.")
+			if after, ok := strings.CutPrefix(name, ".wh."); ok {
+				deletedName := after
 				deletedPath := filepath.Join(filepath.Dir(path), deletedName)
 				if deletedPath == targetPath {
 					deleted = true

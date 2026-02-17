@@ -358,10 +358,7 @@ func (s *SQLiteStore) QueryGrouped(ctx context.Context, opts QueryOptions) (*Tim
 
 	// Get events (with higher limit for grouping)
 	queryOpts := opts
-	queryOpts.Limit = opts.Limit * 10
-	if queryOpts.Limit > 5000 {
-		queryOpts.Limit = 5000
-	}
+	queryOpts.Limit = min(opts.Limit*10, 5000)
 
 	events, err := s.Query(ctx, queryOpts)
 	if err != nil {

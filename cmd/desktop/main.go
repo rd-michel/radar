@@ -140,7 +140,7 @@ func main() {
 		OnBeforeClose: desktopApp.beforeClose,
 		OnShutdown:    desktopApp.shutdown,
 
-		Bind: []interface{}{
+		Bind: []any{
 			desktopApp,
 		},
 

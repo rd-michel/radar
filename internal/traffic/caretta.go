@@ -419,7 +419,7 @@ type prometheusResponse struct {
 		ResultType string `json:"resultType"`
 		Result     []struct {
 			Metric map[string]string `json:"metric"`
-			Value  []interface{}     `json:"value"` // [timestamp, value]
+			Value  []any             `json:"value"` // [timestamp, value]
 		} `json:"result"`
 	} `json:"data"`
 }
@@ -776,10 +776,7 @@ func (c *CarettaSource) discoverMetricsServiceDynamic(ctx context.Context) *metr
 	})
 
 	log.Printf("[caretta] Dynamic discovery found %d candidates, top scores:", len(candidates))
-	limit := 5
-	if len(candidates) < limit {
-		limit = len(candidates)
-	}
+	limit := min(len(candidates), 5)
 	for i := 0; i < limit; i++ {
 		log.Printf("[caretta]   %s/%s (score=%d, basePath=%q)",
 			candidates[i].info.namespace, candidates[i].info.name,

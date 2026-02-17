@@ -46,11 +46,11 @@ type EventStore interface {
 // QueryOptions configures event queries
 type QueryOptions struct {
 	// Filters
-	Namespaces []string     // Filter by namespaces (empty = all)
-	Kinds     []string      // Filter by resource kinds (empty = all)
-	Since     time.Time     // Filter events after this time
-	Until     time.Time     // Filter events before this time
-	Sources   []EventSource // Filter by event source (empty = all)
+	Namespaces []string      // Filter by namespaces (empty = all)
+	Kinds      []string      // Filter by resource kinds (empty = all)
+	Since      time.Time     // Filter events after this time
+	Until      time.Time     // Filter events before this time
+	Sources    []EventSource // Filter by event source (empty = all)
 
 	// Filter preset (overrides individual filters if set)
 	FilterPreset string
@@ -81,8 +81,8 @@ func DefaultQueryOptions() QueryOptions {
 // StoreStats contains statistics about the event store
 type StoreStats struct {
 	TotalEvents   int64     `json:"totalEvents"`
-	OldestEvent   time.Time `json:"oldestEvent,omitempty"`
-	NewestEvent   time.Time `json:"newestEvent,omitempty"`
+	OldestEvent   time.Time `json:"oldestEvent"`
+	NewestEvent   time.Time `json:"newestEvent"`
 	StorageBytes  int64     `json:"storageBytes,omitempty"`
 	SeenResources int       `json:"seenResources"`
 }

@@ -199,7 +199,7 @@ func CheckClusterAccess() error {
 	}
 
 	var lastErr error
-	for attempt := 0; attempt < 2; attempt++ {
+	for attempt := range 2 {
 		if attempt > 0 {
 			// Don't retry errors that won't resolve on their own
 			errType := k8s.ClassifyError(lastErr)
@@ -235,7 +235,7 @@ func ParseKubeconfigDirs(dirs string) []string {
 		return nil
 	}
 	var result []string
-	for _, dir := range strings.Split(dirs, ",") {
+	for dir := range strings.SplitSeq(dirs, ",") {
 		dir = strings.TrimSpace(dir)
 		if dir != "" {
 			result = append(result, dir)

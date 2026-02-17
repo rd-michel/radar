@@ -143,7 +143,7 @@ func TestMemoryStore_Query_Limit(t *testing.T) {
 
 	// Add 10 events
 	events := make([]TimelineEvent, 10)
-	for i := 0; i < 10; i++ {
+	for i := range 10 {
 		events[i] = TimelineEvent{
 			ID:        "limit-" + string(rune('0'+i)),
 			Timestamp: time.Now(),
@@ -197,7 +197,7 @@ func TestMemoryStore_RingBufferOverflow(t *testing.T) {
 	ctx := context.Background()
 
 	// Add 10 events (more than buffer size)
-	for i := 0; i < 10; i++ {
+	for i := range 10 {
 		event := TimelineEvent{
 			ID:        "overflow-" + string(rune('0'+i)),
 			Timestamp: time.Now().Add(time.Duration(i) * time.Second),

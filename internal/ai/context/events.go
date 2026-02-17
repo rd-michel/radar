@@ -74,10 +74,7 @@ func DeduplicateEvents(events []corev1.Event) []DeduplicatedEvent {
 		}
 
 		last := eventLastTimestamp(ev)
-		evCount := int(ev.Count)
-		if evCount < 1 {
-			evCount = 1
-		}
+		evCount := max(int(ev.Count), 1)
 
 		if existing, ok := groups[key]; ok {
 			existing.Count += evCount

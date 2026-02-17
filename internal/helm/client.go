@@ -9,6 +9,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"slices"
 	"sort"
 	"strings"
 	"sync"
@@ -474,8 +475,8 @@ func parseManifestResources(manifest, defaultNamespace string) []OwnedResource {
 
 		for _, line := range lines {
 			line = strings.TrimSpace(line)
-			if strings.HasPrefix(line, "kind:") {
-				kind = strings.TrimSpace(strings.TrimPrefix(line, "kind:"))
+			if after, ok := strings.CutPrefix(line, "kind:"); ok {
+				kind = strings.TrimSpace(after)
 			} else if strings.HasPrefix(line, "name:") && name == "" {
 				// Only take first name (metadata.name, not container names etc)
 				name = strings.TrimSpace(strings.TrimPrefix(line, "name:"))
@@ -877,10 +878,7 @@ func compareVersions(v1, v2 string) int {
 	parts1 := strings.Split(v1, ".")
 	parts2 := strings.Split(v2, ".")
 
-	maxLen := len(parts1)
-	if len(parts2) > maxLen {
-		maxLen = len(parts2)
-	}
+	maxLen := max(len(parts2), len(parts1))
 
 	for i := 0; i < maxLen; i++ {
 		var n1, n2 int
@@ -1115,11 +1113,8 @@ func (c *Client) BatchCheckUpgrades(namespace string) (*BatchUpgradeInfo, error)
 			// Mark which repos contain the current version
 			for i := range candidates {
 				if repoVersions, ok := chartAllVersions[rel.Chart][candidates[i].repoName]; ok {
-					for _, v := range repoVersions {
-						if v == rel.ChartVersion {
-							candidates[i].hasCurrentVersion = true
-							break
-						}
+					if slices.Contains(repoVersions, rel.ChartVersion) {
+						candidates[i].hasCurrentVersion = true
 					}
 				}
 			}

@@ -23,14 +23,14 @@ import (
 
 // DashboardResponse is the aggregated response for the home dashboard
 type DashboardResponse struct {
-	Cluster         DashboardCluster         `json:"cluster"`
-	Health          DashboardHealth          `json:"health"`
-	Problems        []DashboardProblem       `json:"problems"`
-	ResourceCounts  DashboardResourceCounts  `json:"resourceCounts"`
-	RecentEvents    []DashboardEvent         `json:"recentEvents"`
-	RecentChanges   []DashboardChange        `json:"recentChanges"`
-	TopologySummary DashboardTopologySummary `json:"topologySummary"`
-	TrafficSummary  *DashboardTrafficSummary `json:"trafficSummary"`
+	Cluster           DashboardCluster            `json:"cluster"`
+	Health            DashboardHealth             `json:"health"`
+	Problems          []DashboardProblem          `json:"problems"`
+	ResourceCounts    DashboardResourceCounts     `json:"resourceCounts"`
+	RecentEvents      []DashboardEvent            `json:"recentEvents"`
+	RecentChanges     []DashboardChange           `json:"recentChanges"`
+	TopologySummary   DashboardTopologySummary    `json:"topologySummary"`
+	TrafficSummary    *DashboardTrafficSummary    `json:"trafficSummary"`
 	HelmReleases      DashboardHelmSummary        `json:"helmReleases"`
 	Metrics           *DashboardMetrics           `json:"metrics"`
 	CertificateHealth *DashboardCertificateHealth `json:"certificateHealth,omitempty"`
@@ -135,10 +135,10 @@ type CronJobCount struct {
 }
 
 type PVCCount struct {
-	Total    int `json:"total"`
-	Bound    int `json:"bound"`
-	Pending  int `json:"pending"`
-	Unbound  int `json:"unbound"`
+	Total   int `json:"total"`
+	Bound   int `json:"bound"`
+	Pending int `json:"pending"`
+	Unbound int `json:"unbound"`
 }
 
 type DashboardCRDCount struct {
@@ -938,10 +938,7 @@ func (s *Server) getDashboardRecentEvents(cache *k8s.ResourceCache, namespace st
 	})
 
 	// Take top 5
-	limit := 5
-	if len(warnings) < limit {
-		limit = len(warnings)
-	}
+	limit := min(len(warnings), 5)
 
 	result := make([]DashboardEvent, 0, limit)
 	for _, e := range warnings[:limit] {
@@ -1064,10 +1061,7 @@ func (s *Server) getDashboardTrafficSummary(ctx context.Context, namespaces []st
 	})
 
 	topFlows := make([]DashboardTopFlow, 0, 3)
-	limit := 3
-	if len(aggregated) < limit {
-		limit = len(aggregated)
-	}
+	limit := min(len(aggregated), 3)
 	for _, f := range aggregated[:limit] {
 		srcName := f.Source.Name
 		if f.Source.Workload != "" {
@@ -1110,10 +1104,7 @@ func (s *Server) getDashboardHelmSummary(namespace string) DashboardHelmSummary 
 	}
 
 	// Take top 6 releases
-	limit := 6
-	if len(releases) < limit {
-		limit = len(releases)
-	}
+	limit := min(len(releases), 6)
 
 	result.Releases = make([]DashboardHelmRelease, 0, limit)
 	for _, r := range releases[:limit] {
@@ -1273,15 +1264,15 @@ func parseCPUToMillis(s string) int64 {
 	if s == "" {
 		return 0
 	}
-	if strings.HasSuffix(s, "n") {
+	if before, ok := strings.CutSuffix(s, "n"); ok {
 		// nanocores
-		s = strings.TrimSuffix(s, "n")
+		s = before
 		var val int64
 		fmt.Sscanf(s, "%d", &val)
 		return val / 1000000
 	}
-	if strings.HasSuffix(s, "m") {
-		s = strings.TrimSuffix(s, "m")
+	if before, ok := strings.CutSuffix(s, "m"); ok {
+		s = before
 		var val int64
 		fmt.Sscanf(s, "%d", &val)
 		return val
@@ -1298,20 +1289,20 @@ func parseMemoryToBytes(s string) int64 {
 	if s == "" {
 		return 0
 	}
-	if strings.HasSuffix(s, "Ki") {
-		s = strings.TrimSuffix(s, "Ki")
+	if before, ok := strings.CutSuffix(s, "Ki"); ok {
+		s = before
 		var val int64
 		fmt.Sscanf(s, "%d", &val)
 		return val * 1024
 	}
-	if strings.HasSuffix(s, "Mi") {
-		s = strings.TrimSuffix(s, "Mi")
+	if before, ok := strings.CutSuffix(s, "Mi"); ok {
+		s = before
 		var val int64
 		fmt.Sscanf(s, "%d", &val)
 		return val * 1024 * 1024
 	}
-	if strings.HasSuffix(s, "Gi") {
-		s = strings.TrimSuffix(s, "Gi")
+	if before, ok := strings.CutSuffix(s, "Gi"); ok {
+		s = before
 		var val int64
 		fmt.Sscanf(s, "%d", &val)
 		return val * 1024 * 1024 * 1024

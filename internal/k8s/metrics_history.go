@@ -20,8 +20,8 @@ const (
 // MetricsDataPoint represents a single metrics sample
 type MetricsDataPoint struct {
 	Timestamp time.Time `json:"timestamp"`
-	CPU       int64     `json:"cpu"`       // CPU in nanocores
-	Memory    int64     `json:"memory"`    // Memory in bytes
+	CPU       int64     `json:"cpu"`    // CPU in nanocores
+	Memory    int64     `json:"memory"` // Memory in bytes
 }
 
 // ContainerMetricsHistory holds historical metrics for a container
@@ -232,13 +232,13 @@ func (s *MetricsHistoryStore) collectPodMetrics(ctx context.Context, now time.Ti
 		}
 
 		// Extract container metrics
-		containers, ok := item.Object["containers"].([]interface{})
+		containers, ok := item.Object["containers"].([]any)
 		if !ok {
 			continue
 		}
 
 		for _, c := range containers {
-			container, ok := c.(map[string]interface{})
+			container, ok := c.(map[string]any)
 			if !ok {
 				continue
 			}
@@ -248,7 +248,7 @@ func (s *MetricsHistoryStore) collectPodMetrics(ctx context.Context, now time.Ti
 				continue
 			}
 
-			usage, ok := container["usage"].(map[string]interface{})
+			usage, ok := container["usage"].(map[string]any)
 			if !ok {
 				continue
 			}
@@ -303,7 +303,7 @@ func (s *MetricsHistoryStore) collectNodeMetrics(ctx context.Context, now time.T
 			s.nodeMetrics[name] = nodeBuf
 		}
 
-		usage, ok := item.Object["usage"].(map[string]interface{})
+		usage, ok := item.Object["usage"].(map[string]any)
 		if !ok {
 			continue
 		}

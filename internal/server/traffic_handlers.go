@@ -71,7 +71,7 @@ func (s *Server) handleGetTrafficFlows(w http.ResponseWriter, r *http.Request) {
 	// Aggregate flows by service pair
 	aggregated := traffic.AggregateFlows(response.Flows)
 
-	result := map[string]interface{}{
+	result := map[string]any{
 		"source":     response.Source,
 		"timestamp":  response.Timestamp,
 		"flows":      response.Flows,

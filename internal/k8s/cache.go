@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"maps"
 	"strings"
 	"sync"
 	"time"
@@ -146,8 +147,8 @@ func InitResourceCache() error {
 			"daemonsets":               perms.DaemonSets,
 			"statefulsets":             perms.StatefulSets,
 			"replicasets":              perms.ReplicaSets,
-			"ingresses":               perms.Ingresses,
-			"configmaps":              perms.ConfigMaps,
+			"ingresses":                perms.Ingresses,
+			"configmaps":               perms.ConfigMaps,
 			"secrets":                  perms.Secrets,
 			"events":                   perms.Events,
 			"persistentvolumeclaims":   perms.PersistentVolumeClaims,
@@ -185,7 +186,9 @@ func InitResourceCache() error {
 			{"ingresses", "Ingress", func() cache.SharedIndexInformer { return factory.Networking().V1().Ingresses().Informer() }, false},
 			{"jobs", "Job", func() cache.SharedIndexInformer { return factory.Batch().V1().Jobs().Informer() }, false},
 			{"cronjobs", "CronJob", func() cache.SharedIndexInformer { return factory.Batch().V1().CronJobs().Informer() }, false},
-			{"horizontalpodautoscalers", "HorizontalPodAutoscaler", func() cache.SharedIndexInformer { return factory.Autoscaling().V2().HorizontalPodAutoscalers().Informer() }, false},
+			{"horizontalpodautoscalers", "HorizontalPodAutoscaler", func() cache.SharedIndexInformer {
+				return factory.Autoscaling().V2().HorizontalPodAutoscalers().Informer()
+			}, false},
 		}
 
 		enabledCount := 0
@@ -976,9 +979,7 @@ func (c *ResourceCache) GetEnabledResources() map[string]bool {
 	}
 	// Return a copy
 	result := make(map[string]bool, len(c.enabledResources))
-	for k, v := range c.enabledResources {
-		result[k] = v
-	}
+	maps.Copy(result, c.enabledResources)
 	return result
 }
 

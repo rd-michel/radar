@@ -1,6 +1,7 @@
 package timeline
 
 import (
+	"maps"
 	"sync"
 	"time"
 )
@@ -149,19 +150,13 @@ func (m *EventMetrics) GetSnapshot() MetricsSnapshot {
 
 	// Deep copy maps
 	received := make(map[string]int64, len(m.EventsReceived))
-	for k, v := range m.EventsReceived {
-		received[k] = v
-	}
+	maps.Copy(received, m.EventsReceived)
 
 	dropped := make(map[string]int64, len(m.EventsDropped))
-	for k, v := range m.EventsDropped {
-		dropped[k] = v
-	}
+	maps.Copy(dropped, m.EventsDropped)
 
 	recorded := make(map[string]int64, len(m.EventsRecorded))
-	for k, v := range m.EventsRecorded {
-		recorded[k] = v
-	}
+	maps.Copy(recorded, m.EventsRecorded)
 
 	// Copy recent drops
 	recentDrops := make([]DropRecord, len(m.RecentDrops))
