@@ -33,6 +33,13 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   const setTheme = (newTheme: Theme) => {
     setThemeState(newTheme)
     localStorage.setItem(THEME_STORAGE_KEY, newTheme)
+    fetch('/api/settings', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ theme: newTheme }),
+    }).then((res) => {
+      if (!res.ok) console.warn('[settings] Failed to persist theme:', res.status)
+    }).catch((err) => console.warn('[settings] Failed to persist theme:', err))
   }
 
   const toggleTheme = () => {
@@ -43,6 +50,19 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', theme)
   }, [theme])
+
+  // Sync theme from server (persisted settings survive port changes in desktop app)
+  useEffect(() => {
+    fetch('/api/settings')
+      .then((res) => res.ok ? res.json() : null)
+      .then((data) => {
+        if (data?.theme && (data.theme === 'dark' || data.theme === 'light') && data.theme !== theme) {
+          setThemeState(data.theme)
+          localStorage.setItem(THEME_STORAGE_KEY, data.theme)
+        }
+      })
+      .catch((err) => console.warn('[settings] Failed to load theme from server:', err))
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Listen for system theme changes
   useEffect(() => {
