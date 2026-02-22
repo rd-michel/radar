@@ -131,6 +131,8 @@ import { CertificateCell, CertificateRequestCell, ClusterIssuerCell, IssuerCell,
 import { NodePoolCell, NodeClaimCell, EC2NodeClassCell } from './renderers/karpenter-cells'
 import { ScaledObjectCell, ScaledJobCell, TriggerAuthenticationCell, ClusterTriggerAuthenticationCell } from './renderers/keda-cells'
 import { usePinnedKinds } from '../../hooks/useFavorites'
+import { useRegisterShortcut, useRegisterShortcuts } from '../../hooks/useKeyboardShortcuts'
+import { useOpenLogs, useOpenWorkloadLogs } from '../dock'
 
 // Pod problem filter options (special multi-select, not a single column value)
 const POD_PROBLEMS = ['CrashLoopBackOff', 'ImagePullBackOff', 'OOMKilled', 'Unschedulable', 'Not Ready', 'High Restarts'] as const
@@ -884,6 +886,7 @@ interface ResourcesViewProps {
   namespaces: string[]
   selectedResource?: SelectedResource | null
   onResourceClick?: NavigateToResource
+  onResourceClickYaml?: NavigateToResource
   onKindChange?: () => void // Called when user changes resource type in sidebar
 }
 
@@ -928,7 +931,7 @@ function getInitialFiltersFromURL() {
 // Sort state type
 type SortDirection = 'asc' | 'desc' | null
 
-export function ResourcesView({ namespaces, selectedResource, onResourceClick, onKindChange }: ResourcesViewProps) {
+export function ResourcesView({ namespaces, selectedResource, onResourceClick, onResourceClickYaml, onKindChange }: ResourcesViewProps) {
   const location = useLocation()
   const initialFilters = getInitialFiltersFromURL()
   const [selectedKind, setSelectedKind] = useState<SelectedKindInfo>(getInitialKindFromURL)
@@ -970,7 +973,7 @@ export function ResourcesView({ namespaces, selectedResource, onResourceClick, o
   const shouldPushHistory = useRef(false)
 
   // Ref to selected row for scrolling into view on deeplink
-  const selectedRowRef = useRef<HTMLTableRowElement>(null)
+  const selectedRowRef = useRef<HTMLTableCellElement>(null)
   // Ref to selected sidebar item for scrolling into view on deeplink
   const selectedSidebarRef = useRef<HTMLButtonElement>(null)
   // Track what resource we last scrolled to, to avoid re-scrolling on group expand
@@ -1046,16 +1049,20 @@ export function ResourcesView({ namespaces, selectedResource, onResourceClick, o
     })
   }, [visibleColumns, columnWidths, selectedKind.name])
 
-  // Close column picker on outside click
+  // Close column picker on outside click or Escape
   useEffect(() => {
     if (!showColumnPicker) return
-    const handler = (e: MouseEvent) => {
+    const handleClick = (e: MouseEvent) => {
       if (columnPickerRef.current && !columnPickerRef.current.contains(e.target as Node)) {
         setShowColumnPicker(false)
       }
     }
-    document.addEventListener('mousedown', handler)
-    return () => document.removeEventListener('mousedown', handler)
+    const handleKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') { e.stopPropagation(); setShowColumnPicker(false) }
+    }
+    document.addEventListener('mousedown', handleClick)
+    document.addEventListener('keydown', handleKey, true)
+    return () => { document.removeEventListener('mousedown', handleClick); document.removeEventListener('keydown', handleKey, true) }
   }, [showColumnPicker])
 
   // Whether any columns have been resized (triggers switch to fixed grid sizes + spacer)
@@ -1148,30 +1155,258 @@ export function ResourcesView({ namespaces, selectedResource, onResourceClick, o
     isColumnSettingsLoaded.current = false
   }, [selectedKind.name, allColumns])
 
-  // Keyboard shortcut: / or Cmd/Ctrl+K to focus search
+  // Keyboard shortcut: / to focus search
+  useRegisterShortcut({
+    id: 'resources-search',
+    keys: '/',
+    description: 'Focus search',
+    category: 'Search',
+    scope: 'resources',
+    handler: () => searchInputRef.current?.focus(),
+  })
+
+  // Keyboard navigation: highlighted row state
+  const [highlightedIndex, setHighlightedIndex] = useState(-1)
+  const highlightedRowRef = useRef<HTMLTableCellElement>(null)
+
+  // Reset highlight when kind, search, sort, or namespace changes
+  const namespacesKey = namespaces.join(',')
+  useEffect(() => { setHighlightedIndex(-1) }, [selectedKind.name, searchTerm, sortColumn, sortDirection, namespacesKey])
+
+  // Scroll highlighted row into view
   useEffect(() => {
-    const handler = (e: KeyboardEvent) => {
-      if (e.key === '/' || ((e.metaKey || e.ctrlKey) && e.key === 'k')) {
-        const tag = (e.target as HTMLElement)?.tagName
-        if (tag === 'INPUT' || tag === 'TEXTAREA') return
-        e.preventDefault()
-        searchInputRef.current?.focus()
-      }
+    if (highlightedIndex >= 0 && highlightedRowRef.current) {
+      highlightedRowRef.current.scrollIntoView({ block: 'nearest' })
     }
-    document.addEventListener('keydown', handler)
-    return () => document.removeEventListener('keydown', handler)
+  }, [highlightedIndex])
+
+  // Open logs for pod / workload resources
+  const openLogs = useOpenLogs()
+  const openWorkloadLogs = useOpenWorkloadLogs()
+
+  // Helper: get resource at highlighted index
+  const getHighlightedResource = useCallback(() => {
+    // filteredResources is computed later in the component — use a ref to access it
+    return highlightedResourceRef.current
   }, [])
 
-  // Close filter dropdown on outside click
+  // Register navigation shortcuts
+  useRegisterShortcuts([
+    {
+      id: 'resources-nav-down',
+      keys: 'j',
+      description: 'Next row',
+      category: 'Table',
+      scope: 'resources',
+      handler: () => setHighlightedIndex(i => {
+        const max = filteredResourceCountRef.current - 1
+        return i < max ? i + 1 : i
+      }),
+    },
+    {
+      id: 'resources-nav-down-arrow',
+      keys: 'ArrowDown',
+      description: 'Next row',
+      category: 'Table',
+      scope: 'resources',
+      handler: () => setHighlightedIndex(i => {
+        const max = filteredResourceCountRef.current - 1
+        return i < max ? i + 1 : i
+      }),
+    },
+    {
+      id: 'resources-nav-up',
+      keys: 'k',
+      description: 'Previous row',
+      category: 'Table',
+      scope: 'resources',
+      handler: () => setHighlightedIndex(i => i > 0 ? i - 1 : 0),
+    },
+    {
+      id: 'resources-nav-up-arrow',
+      keys: 'ArrowUp',
+      description: 'Previous row',
+      category: 'Table',
+      scope: 'resources',
+      handler: () => setHighlightedIndex(i => i > 0 ? i - 1 : 0),
+    },
+    {
+      id: 'resources-nav-top',
+      keys: 'g g',
+      description: 'Jump to first row',
+      category: 'Table',
+      scope: 'resources',
+      handler: () => setHighlightedIndex(0),
+    },
+    {
+      id: 'resources-nav-bottom',
+      keys: 'G',
+      description: 'Jump to last row',
+      category: 'Table',
+      scope: 'resources',
+      handler: () => setHighlightedIndex(Math.max(0, filteredResourceCountRef.current - 1)),
+    },
+    {
+      id: 'resources-open',
+      keys: 'Enter',
+      description: 'Open resource detail',
+      category: 'Resource Actions',
+      scope: 'resources',
+      handler: () => {
+        const res = getHighlightedResource()
+        if (!res?.metadata?.name) return
+        onResourceClick?.({ kind: selectedKind.name, namespace: res.metadata.namespace || '', name: res.metadata.name, group: selectedKind.group })
+      },
+      enabled: highlightedIndex >= 0,
+    },
+    {
+      id: 'resources-open-detail',
+      keys: 'd',
+      description: 'Open resource detail',
+      category: 'Resource Actions',
+      scope: 'resources',
+      handler: () => {
+        const res = getHighlightedResource()
+        if (!res?.metadata?.name) return
+        onResourceClick?.({ kind: selectedKind.name, namespace: res.metadata.namespace || '', name: res.metadata.name, group: selectedKind.group })
+      },
+      enabled: highlightedIndex >= 0,
+    },
+    {
+      id: 'resources-open-yaml',
+      keys: 'y',
+      description: 'Open YAML view',
+      category: 'Resource Actions',
+      scope: 'resources',
+      handler: () => {
+        const res = getHighlightedResource()
+        if (!res?.metadata?.name) return
+        const cb = onResourceClickYaml || onResourceClick
+        cb?.({ kind: selectedKind.name, namespace: res.metadata.namespace || '', name: res.metadata.name, group: selectedKind.group })
+      },
+      enabled: highlightedIndex >= 0,
+    },
+    {
+      id: 'resources-logs',
+      keys: 'l',
+      description: 'Open logs',
+      category: 'Resource Actions',
+      scope: 'resources',
+      handler: () => {
+        const res = getHighlightedResource()
+        if (!res) return
+        const kindLower = selectedKind.name.toLowerCase()
+        const ns = res.metadata?.namespace || ''
+        const name = res.metadata?.name || ''
+        if (kindLower === 'pods') {
+          // For pods, use openLogs directly (not workload logs)
+          const containers = (res.spec?.containers || []).map((c: { name: string }) => c.name)
+          if (containers.length > 0) {
+            openLogs({ namespace: ns, podName: name, containers })
+          }
+        } else if (['deployments', 'statefulsets', 'daemonsets', 'replicasets', 'jobs'].includes(kindLower)) {
+          openWorkloadLogs({ namespace: ns, workloadKind: selectedKind.kind, workloadName: name })
+        }
+      },
+      enabled: highlightedIndex >= 0 && ['pods', 'deployments', 'statefulsets', 'daemonsets', 'replicasets', 'jobs'].includes(selectedKind.name.toLowerCase()),
+    },
+    {
+      id: 'resources-sort-name',
+      keys: 'N',
+      description: 'Sort by name',
+      category: 'Table',
+      scope: 'resources',
+      handler: () => handleSort('name'),
+    },
+    {
+      id: 'resources-sort-age',
+      keys: 'A',
+      description: 'Sort by age',
+      category: 'Table',
+      scope: 'resources',
+      handler: () => handleSort('age'),
+    },
+    {
+      id: 'resources-sort-status',
+      keys: 'S',
+      description: 'Sort by status',
+      category: 'Table',
+      scope: 'resources',
+      handler: () => handleSort('status'),
+    },
+    {
+      id: 'resources-clear-highlight',
+      keys: 'Escape',
+      description: 'Clear highlight / blur search',
+      category: 'Table',
+      scope: 'resources',
+      handler: () => {
+        // Close dropdowns first, then clear highlight, then blur search
+        if (showColumnPicker) { setShowColumnPicker(false); return }
+        if (showFilterDropdown) { setShowFilterDropdown(false); return }
+        if (highlightedIndex >= 0) setHighlightedIndex(-1)
+        else searchInputRef.current?.blur()
+      },
+    },
+  ])
+
+  // Refs for accessing filteredResources inside shortcuts (computed later in component)
+  const filteredResourceCountRef = useRef(0)
+  const highlightedResourceRef = useRef<any>(null)
+
+  // Ref for flat kind list used by [ / ] sidebar navigation (populated after filteredCategories is computed)
+  const flatKindListRef = useRef<SelectedKindInfo[]>([])
+
+  // Sidebar kind navigation: [ = previous kind, ] = next kind
+  useRegisterShortcuts([
+    {
+      id: 'resources-prev-kind',
+      keys: '[',
+      description: 'Previous resource kind',
+      category: 'Table',
+      scope: 'resources',
+      handler: () => {
+        const list = flatKindListRef.current
+        if (list.length === 0) return
+        const idx = list.findIndex(k => k.name === selectedKind.name && k.group === selectedKind.group)
+        const prev = idx > 0 ? list[idx - 1] : list[list.length - 1]
+        shouldPushHistory.current = true
+        setSelectedKind(prev)
+        onKindChange?.()
+      },
+    },
+    {
+      id: 'resources-next-kind',
+      keys: ']',
+      description: 'Next resource kind',
+      category: 'Table',
+      scope: 'resources',
+      handler: () => {
+        const list = flatKindListRef.current
+        if (list.length === 0) return
+        const idx = list.findIndex(k => k.name === selectedKind.name && k.group === selectedKind.group)
+        const next = idx < list.length - 1 ? list[idx + 1] : list[0]
+        shouldPushHistory.current = true
+        setSelectedKind(next)
+        onKindChange?.()
+      },
+    },
+  ])
+
+  // Close filter dropdown on outside click or Escape
   useEffect(() => {
     if (!showFilterDropdown) return
-    const handler = (e: MouseEvent) => {
+    const handleClick = (e: MouseEvent) => {
       if (filterDropdownRef.current && !filterDropdownRef.current.contains(e.target as Node)) {
         setShowFilterDropdown(false)
       }
     }
-    document.addEventListener('mousedown', handler)
-    return () => document.removeEventListener('mousedown', handler)
+    const handleKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') { e.stopPropagation(); setShowFilterDropdown(false) }
+    }
+    document.addEventListener('mousedown', handleClick)
+    document.addEventListener('keydown', handleKey, true)
+    return () => { document.removeEventListener('mousedown', handleClick); document.removeEventListener('keydown', handleKey, true) }
   }, [showFilterDropdown])
 
   // Sync state from URL when navigation occurs (e.g., deep linking from WorkloadRenderer)
@@ -1816,6 +2051,10 @@ export function ResourcesView({ namespaces, selectedResource, onResourceClick, o
     return result
   }, [resources, searchTerm, columnFilters, problemFilters, showInactiveReplicaSets, labelSelector, ownerKind, ownerName, selectedKind.name, sortColumn, sortDirection, getSortValue, podMatchesProblemFilter])
 
+  // Keep refs in sync for keyboard shortcuts (shortcuts can't capture filteredResources directly)
+  filteredResourceCountRef.current = filteredResources.length
+  highlightedResourceRef.current = highlightedIndex >= 0 ? filteredResources[highlightedIndex] ?? null : null
+
   // Scroll to selected row when selection changes (but not on group expand/filteredResources change)
   useEffect(() => {
     if (!selectedResource) {
@@ -1922,6 +2161,26 @@ export function ResourcesView({ namespaces, selectedResource, onResourceClick, o
       })
       .filter(Boolean) as typeof sortedCategories
   }, [sortedCategories, kindFilter])
+
+  // Build flat kind list for [ / ] sidebar navigation
+  // Includes pinned kinds first, then all visible kinds from categories (deduped)
+  useEffect(() => {
+    const list: SelectedKindInfo[] = []
+    const seen = new Set<string>()
+    const addKind = (k: SelectedKindInfo) => {
+      const key = `${k.group}/${k.name}`
+      if (!seen.has(key)) { seen.add(key); list.push(k) }
+    }
+    for (const p of pinned) addKind({ name: p.name, kind: p.kind, group: p.group })
+    if (filteredCategories) {
+      for (const cat of filteredCategories) {
+        for (const r of cat.visibleResources) {
+          addKind({ name: r.name, kind: r.kind, group: r.group })
+        }
+      }
+    }
+    flatKindListRef.current = list
+  }, [pinned, filteredCategories])
 
   // Auto-expand all categories when filtering
   const isKindFiltering = kindFilter.trim().length > 0
@@ -2320,7 +2579,7 @@ export function ResourcesView({ namespaces, selectedResource, onResourceClick, o
             <input
               ref={searchInputRef}
               type="text"
-              placeholder="Search... (/ or ⌘K)"
+              placeholder="Search... (press /)"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="w-full max-w-md pl-10 pr-4 py-2 bg-theme-elevated border border-theme-border-light rounded-lg text-sm text-theme-text-primary placeholder-theme-text-disabled focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -2662,20 +2921,23 @@ export function ResourcesView({ namespaces, selectedResource, onResourceClick, o
                 </tr>
               </thead>
               <tbody style={{ display: 'contents' }}>
-                {filteredResources.map((resource: any) => {
+                {filteredResources.map((resource: any, index: number) => {
                   const isSelected = selectedResource?.kind === selectedKind.name &&
                     selectedResource?.namespace === resource.metadata?.namespace &&
                     selectedResource?.name === resource.metadata?.name
+                  const isHighlighted = index === highlightedIndex
                   return (
                     <ResourceRow
                       key={resource.metadata?.uid || `${resource.metadata?.namespace}-${resource.metadata?.name}`}
-                      ref={isSelected ? selectedRowRef : null}
+                      ref={isSelected ? selectedRowRef : isHighlighted ? highlightedRowRef : null}
                       resource={resource}
                       kind={selectedKind.name}
                       columns={columns}
                       hasSpacerColumn={hasResizedColumns}
                       isSelected={isSelected}
+                      isHighlighted={isHighlighted}
                       onClick={() => onResourceClick?.({ kind: selectedKind.name, namespace: resource.metadata?.namespace || '', name: resource.metadata?.name, group: selectedKind.group })}
+                      onMouseEnter={() => setHighlightedIndex(-1)}
                     />
                   )
                 })}
@@ -2770,26 +3032,31 @@ interface ResourceRowProps {
   columns: Column[]
   hasSpacerColumn: boolean
   isSelected?: boolean
+  isHighlighted?: boolean
   onClick?: () => void
+  onMouseEnter?: () => void
 }
 
-const ResourceRow = forwardRef<HTMLTableRowElement, ResourceRowProps>(
-  function ResourceRow({ resource, kind, columns, hasSpacerColumn, isSelected, onClick }, ref) {
+const ResourceRow = forwardRef<HTMLTableCellElement, ResourceRowProps>(
+  function ResourceRow({ resource, kind, columns, hasSpacerColumn, isSelected, isHighlighted, onClick, onMouseEnter }, ref) {
     return (
       <tr
-        ref={ref}
         onClick={onClick}
+        onMouseEnter={onMouseEnter}
         className="group/row contents"
       >
-      {columns.map((col) => (
+      {columns.map((col, i) => (
         <td
           key={col.key}
+          ref={i === 0 ? ref : undefined}
           className={clsx(
             'px-4 py-3 border-b-subtle cursor-pointer transition-colors',
             col.key !== 'status' && 'overflow-hidden truncate',
             isSelected
               ? 'bg-blue-500/20 group-hover/row:bg-blue-500/30'
-              : 'group-hover/row:bg-theme-surface/50'
+              : isHighlighted
+                ? 'bg-blue-500/10 ring-1 ring-inset ring-blue-400/30'
+                : 'group-hover/row:bg-theme-surface/50'
           )}
         >
           <CellContent resource={resource} kind={kind} column={col.key} />

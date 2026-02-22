@@ -24,10 +24,13 @@ import { CapabilitiesProvider } from './contexts/CapabilitiesContext'
 import { ErrorBoundary } from './components/ui/ErrorBoundary'
 import { NamespaceSelector } from './components/ui/NamespaceSelector'
 import { UpdateNotification } from './components/ui/UpdateNotification'
+import { ShortcutHelpOverlay } from './components/ui/ShortcutHelpOverlay'
+import { CommandPalette } from './components/ui/CommandPalette'
 import { useEventSource } from './hooks/useEventSource'
-import { useNamespaces } from './api/client'
+import { useNamespaces, useSwitchContext } from './api/client'
+import { KeyboardShortcutProvider, useRegisterShortcut, useRegisterShortcuts } from './hooks/useKeyboardShortcuts'
 import { Loader2 } from 'lucide-react'
-import { RefreshCw, FolderTree, Network, List, Clock, Package, Sun, Moon, Activity, Home, Star } from 'lucide-react'
+import { RefreshCw, FolderTree, Network, List, Clock, Package, Sun, Moon, Activity, Home, Star, Search } from 'lucide-react'
 import { useTheme } from './context/ThemeContext'
 import { Tooltip } from './components/ui/Tooltip'
 import type { TopologyNode, GroupingMode, MainView, SelectedResource, SelectedHelmRelease, NodeKind, Topology } from './types'
@@ -158,6 +161,7 @@ function AppInner() {
 
   const [namespaces, setNamespaces] = useState<string[]>(getInitialState().namespaces)
   const [selectedResource, setSelectedResource] = useState<SelectedResource | null>(null)
+  const [drawerInitialTab, setDrawerInitialTab] = useState<'detail' | 'yaml'>('detail')
   const [selectedHelmRelease, setSelectedHelmRelease] = useState<SelectedHelmRelease | null>(null)
   const [topologyMode, setTopologyMode] = useState<'resources' | 'traffic'>(getInitialState().topologyMode)
   const [groupingMode, setGroupingMode] = useState<GroupingMode>(getInitialState().grouping)
@@ -182,6 +186,70 @@ function AppInner() {
   // Topology filter state
   const [visibleKinds, setVisibleKinds] = useState<Set<NodeKind>>(() => new Set(DEFAULT_VISIBLE_KINDS))
   const [filterSidebarCollapsed, setFilterSidebarCollapsed] = useState(false)
+
+  // Help overlay state
+  const [showHelp, setShowHelp] = useState(false)
+
+  // Command palette state
+  const [showCommandPalette, setShowCommandPalette] = useState(false)
+
+  // Pending navigation that needs namespace filter confirmation
+  const [pendingKindNav, setPendingKindNav] = useState<{ kind: string; group: string } | null>(null)
+
+  // Theme toggle for keyboard shortcut
+  const { toggleTheme } = useTheme()
+
+  // Context switching for command palette
+  const switchContext = useSwitchContext()
+
+  // View switching keyboard shortcuts
+  const views: ExtendedMainView[] = ['home', 'topology', 'resources', 'timeline', 'helm', 'traffic']
+  useRegisterShortcuts([
+    ...views.map((view, i) => ({
+      id: `view-${view}`,
+      keys: String(i + 1),
+      description: `Go to ${view.charAt(0).toUpperCase() + view.slice(1)}`,
+      category: 'Navigation' as const,
+      scope: 'global' as const,
+      handler: () => setMainView(view),
+    })),
+    {
+      id: 'theme-toggle',
+      keys: 't',
+      description: 'Toggle dark/light theme',
+      category: 'General' as const,
+      scope: 'global' as const,
+      handler: () => toggleTheme(),
+    },
+    {
+      id: 'help-toggle',
+      keys: '?',
+      description: 'Show keyboard shortcuts',
+      category: 'General' as const,
+      scope: 'global' as const,
+      handler: () => setShowHelp(prev => !prev),
+    },
+    {
+      id: 'command-palette',
+      keys: 'Cmd+k',
+      description: 'Open command palette',
+      category: 'General' as const,
+      scope: 'global' as const,
+      handler: () => setShowCommandPalette(true),
+    },
+  ])
+
+  // Separate registration for help-close — its `enabled` changes with showHelp,
+  // and keeping it in the batch above would cause all stable shortcuts to churn.
+  useRegisterShortcut({
+    id: 'help-close',
+    keys: 'Escape',
+    description: 'Close overlay',
+    category: 'General',
+    scope: 'global',
+    handler: () => setShowHelp(false),
+    enabled: showHelp,
+  })
 
   // Compute effective grouping mode:
   // - All namespaces: must use 'namespace' or 'app' (no 'none')
@@ -491,6 +559,17 @@ function AppInner() {
             disabledTooltip="Helm view always shows all namespaces"
           />
 
+          {/* Command palette trigger */}
+          <button
+            onClick={() => setShowCommandPalette(true)}
+            className="flex items-center gap-2 h-7 px-2.5 rounded-md bg-theme-elevated hover:bg-theme-hover text-theme-text-secondary hover:text-theme-text-primary transition-colors"
+          >
+            <Search className="w-3.5 h-3.5" />
+            <kbd className="text-[10px] text-theme-text-tertiary bg-theme-surface px-1 py-0.5 rounded border border-theme-border-light">
+              {typeof navigator !== 'undefined' && navigator.platform.includes('Mac') ? '⌘' : 'Ctrl+'}K
+            </kbd>
+          </button>
+
           {/* GitHub star */}
           <GitHubStarButton />
 
@@ -706,6 +785,7 @@ function AppInner() {
             namespaces={namespaces}
             selectedResource={selectedResource}
             onResourceClick={setSelectedResource}
+            onResourceClickYaml={(res) => { setDrawerInitialTab('yaml'); setSelectedResource(res) }}
             onKindChange={() => setSelectedResource(null)}
           />
         )}
@@ -756,8 +836,9 @@ function AppInner() {
       {selectedResource && (
         <ResourceDetailDrawer
           resource={selectedResource}
-          onClose={() => setSelectedResource(null)}
-          onNavigate={(res) => setSelectedResource(res)}
+          initialTab={drawerInitialTab}
+          onClose={() => { setSelectedResource(null); setDrawerInitialTab('detail') }}
+          onNavigate={(res) => { setDrawerInitialTab('detail'); setSelectedResource(res) }}
         />
       )}
 
@@ -790,8 +871,115 @@ function AppInner() {
       {/* Spacer for dock */}
       <DockSpacer />
 
+      {/* Keyboard shortcut help button — fixed bottom-right, above dock */}
+      <HelpButton showHelp={showHelp} showCommandPalette={showCommandPalette} onClick={() => setShowHelp(true)} />
+
+      {/* Keyboard shortcut help overlay */}
+      {showHelp && <ShortcutHelpOverlay onClose={() => setShowHelp(false)} currentView={mainView} />}
+
+      {/* Command palette */}
+      {showCommandPalette && (
+        <CommandPalette
+          onClose={() => setShowCommandPalette(false)}
+          onNavigateView={(view) => setMainView(view)}
+          onNavigateKind={(kind, group) => {
+            if (namespaces.length > 0) {
+              // Namespace filter is active — confirm before navigating
+              setPendingKindNav({ kind, group })
+            } else {
+              const params = new URLSearchParams(searchParams)
+              params.delete('kind')
+              if (group) params.set('apiGroup', group)
+              else params.delete('apiGroup')
+              params.delete('resource')
+              navigate({ pathname: `/resources/${kind}`, search: params.toString() })
+            }
+          }}
+          onSwitchContext={(name) => switchContext.mutate({ name })}
+          onSetNamespaces={setNamespaces}
+          onToggleTheme={toggleTheme}
+        />
+      )}
+
+      {/* Namespace filter confirmation for command palette navigation */}
+      {pendingKindNav && (
+        <NamespaceFilterDialog
+          namespaces={namespaces}
+          onConfirm={() => {
+            setNamespaces([])
+            const params = new URLSearchParams()
+            if (pendingKindNav.group) params.set('apiGroup', pendingKindNav.group)
+            navigate({ pathname: `/resources/${pendingKindNav.kind}`, search: params.toString() })
+            setPendingKindNav(null)
+          }}
+          onKeep={() => {
+            const params = new URLSearchParams(searchParams)
+            params.delete('kind')
+            if (pendingKindNav.group) params.set('apiGroup', pendingKindNav.group)
+            else params.delete('apiGroup')
+            params.delete('resource')
+            navigate({ pathname: `/resources/${pendingKindNav.kind}`, search: params.toString() })
+            setPendingKindNav(null)
+          }}
+          onClose={() => setPendingKindNav(null)}
+        />
+      )}
+
       {/* Debug overlay - only in dev mode */}
       {import.meta.env.DEV && <DebugOverlay />}
+    </div>
+  )
+}
+
+// Lightweight dialog to confirm clearing namespace filter when navigating from command palette
+function NamespaceFilterDialog({ namespaces, onConfirm, onKeep, onClose }: {
+  namespaces: string[]
+  onConfirm: () => void
+  onKeep: () => void
+  onClose: () => void
+}) {
+  const confirmRef = useRef<HTMLButtonElement>(null)
+
+  useEffect(() => {
+    confirmRef.current?.focus()
+  }, [])
+
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); onClose() }
+    }
+    document.addEventListener('keydown', handler, true)
+    return () => document.removeEventListener('keydown', handler, true)
+  }, [onClose])
+
+  const label = namespaces.length === 1 ? namespaces[0] : `${namespaces.length} namespaces`
+
+  return (
+    <div className="fixed inset-0 z-[100] flex items-start justify-center pt-[20vh]">
+      <div className="absolute inset-0 bg-theme-base/60 backdrop-blur-sm" onClick={onClose} />
+      <div className="relative bg-theme-surface border border-theme-border rounded-xl shadow-2xl max-w-sm w-full mx-4 p-4">
+        <p className="text-sm text-theme-text-primary mb-1">
+          Namespace filter is active
+        </p>
+        <p className="text-xs text-theme-text-secondary mb-4">
+          Currently filtered to <span className="font-medium text-theme-text-primary">{label}</span>. Clear filter to show all namespaces?
+        </p>
+        <div className="flex items-center justify-end gap-2">
+          <button
+            onClick={onKeep}
+            className="px-3 py-1.5 text-xs font-medium text-theme-text-secondary hover:text-theme-text-primary hover:bg-theme-elevated rounded-lg transition-colors"
+          >
+            Keep filter
+          </button>
+          <button
+            ref={confirmRef}
+            onClick={onConfirm}
+            className="px-3 py-1.5 text-xs font-medium bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-1 focus:ring-offset-theme-surface"
+          >
+            Clear filter
+          </button>
+        </div>
+      </div>
     </div>
   )
 }
@@ -803,6 +991,24 @@ function DockSpacer() {
   return <div style={{ height: isExpanded ? 300 : 36 }} />
 }
 
+// Floating ? button that positions itself above the dock
+function HelpButton({ showHelp, showCommandPalette, onClick }: { showHelp: boolean; showCommandPalette: boolean; onClick: () => void }) {
+  const { tabs, isExpanded } = useDock()
+  if (showHelp || showCommandPalette) return null
+  const bottomOffset = tabs.length > 0 ? (isExpanded ? 300 : 36) + 12 : 16
+  return (
+    <Tooltip content="Keyboard shortcuts (?)" position="top">
+      <button
+        onClick={onClick}
+        style={{ bottom: bottomOffset }}
+        className="fixed right-4 z-40 w-7 h-7 flex items-center justify-center rounded-full bg-theme-elevated/80 hover:bg-theme-hover border border-theme-border-light text-theme-text-tertiary hover:text-theme-text-secondary text-xs font-medium shadow-sm backdrop-blur-sm transition-all"
+      >
+        ?
+      </button>
+    </Tooltip>
+  )
+}
+
 // Main App component wrapped with providers
 function App() {
   return (
@@ -810,7 +1016,9 @@ function App() {
       <CapabilitiesProvider>
         <ContextSwitchProvider>
           <DockProvider>
-            <AppInner />
+            <KeyboardShortcutProvider>
+              <AppInner />
+            </KeyboardShortcutProvider>
           </DockProvider>
         </ContextSwitchProvider>
       </CapabilitiesProvider>

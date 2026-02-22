@@ -1,4 +1,4 @@
-import { useState, useMemo, useRef, useEffect } from 'react'
+import { useState, useMemo, useRef } from 'react'
 import { useRefreshAnimation } from '../../hooks/useRefreshAnimation'
 import {
   AlertCircle,
@@ -24,6 +24,7 @@ import { getOperationColor, getHealthBadgeColor } from '../../utils/badge-colors
 import { ResourceRefBadge } from '../resources/drawer-components'
 import type { NavigateToResource } from '../../utils/navigation'
 import { kindToPlural, refToSelectedResource } from '../../utils/navigation'
+import { useRegisterShortcut } from '../../hooks/useKeyboardShortcuts'
 
 /** Format resource age (e.g., "3d", "5h", "10m") */
 function formatResourceAge(createdAt: string): string {
@@ -84,27 +85,23 @@ export function TimelineList({ namespaces, onViewChange, currentView = 'list', o
   const [expandedItem, setExpandedItem] = useState<string | null>(null)
   const searchInputRef = useRef<HTMLInputElement>(null)
 
-  // Keyboard shortcut: / or Cmd/Ctrl+K to focus search
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      // Ignore if typing in an input
-      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) {
-        // Allow Escape to blur
-        if (e.key === 'Escape') {
-          (e.target as HTMLElement).blur()
-        }
-        return
-      }
-
-      if (e.key === '/' || ((e.metaKey || e.ctrlKey) && e.key === 'k')) {
-        e.preventDefault()
-        searchInputRef.current?.focus()
-      }
-    }
-
-    window.addEventListener('keydown', handleKeyDown)
-    return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [])
+  // Keyboard shortcut: / to focus search
+  useRegisterShortcut({
+    id: 'timeline-list-search',
+    keys: '/',
+    description: 'Focus search',
+    category: 'Search',
+    scope: 'timeline',
+    handler: () => searchInputRef.current?.focus(),
+  })
+  useRegisterShortcut({
+    id: 'timeline-list-escape',
+    keys: 'Escape',
+    description: 'Blur search',
+    category: 'Search',
+    scope: 'timeline',
+    handler: () => searchInputRef.current?.blur(),
+  })
 
   // Fetch unified timeline - always include all events, filter client-side
   const { data: activity, isLoading, refetch: refetchChanges } = useChanges({
@@ -286,7 +283,7 @@ export function TimelineList({ namespaces, onViewChange, currentView = 'list', o
           <input
             ref={searchInputRef}
             type="text"
-            placeholder="Search... (/ or ⌘K)"
+            placeholder="Search... (press /)"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             className="w-full max-w-md pl-10 pr-4 py-2 bg-theme-elevated border border-theme-border-light rounded-lg text-sm text-theme-text-primary placeholder-theme-text-disabled focus:outline-none focus:ring-2 focus:ring-blue-500"

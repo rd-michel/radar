@@ -39,6 +39,7 @@ import {
   HealthSpan,
   timeToX as sharedTimeToX,
 } from './shared'
+import { useRegisterShortcut } from '../../hooks/useKeyboardShortcuts'
 
 interface TimelineSwimlanesProps {
   events: TimelineEvent[]
@@ -221,32 +222,25 @@ export function TimelineSwimlanes({ events, isLoading, onResourceClick, viewMode
   }, [events, hasAutoZoomed])
 
   // Keyboard shortcuts
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      // Escape closes detail panel or blurs input
-      if (e.key === 'Escape') {
-        if (selectedEvent) {
-          setSelectedEvent(null)
-          return
-        }
-        if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) {
-          (e.target as HTMLElement).blur()
-        }
-        return
-      }
-      // Don't handle other shortcuts when typing
-      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) {
-        return
-      }
-      // / or Cmd/Ctrl+K to focus search
-      if (e.key === '/' || ((e.metaKey || e.ctrlKey) && e.key === 'k')) {
-        e.preventDefault()
-        searchInputRef.current?.focus()
-      }
-    }
-    window.addEventListener('keydown', handleKeyDown)
-    return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [selectedEvent])
+  useRegisterShortcut({
+    id: 'swimlane-search',
+    keys: '/',
+    description: 'Focus search',
+    category: 'Search',
+    scope: 'timeline',
+    handler: () => searchInputRef.current?.focus(),
+  })
+  useRegisterShortcut({
+    id: 'swimlane-escape',
+    keys: 'Escape',
+    description: 'Close detail / blur search',
+    category: 'Timeline',
+    scope: 'timeline',
+    handler: () => {
+      if (selectedEvent) setSelectedEvent(null)
+      else searchInputRef.current?.blur()
+    },
+  })
 
   // Filter events by search term
   const filteredEvents = useMemo(() => {
@@ -465,7 +459,7 @@ export function TimelineSwimlanes({ events, isLoading, onResourceClick, viewMode
               type="text"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              placeholder="Search... (/ or ⌘K)"
+              placeholder="Search... (press /)"
               className="w-80 pl-9 pr-8 py-1.5 text-sm bg-theme-elevated border border-theme-border-light rounded-lg text-theme-text-primary placeholder-theme-text-disabled focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             />
             {searchTerm && (
