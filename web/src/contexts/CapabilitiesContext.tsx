@@ -8,6 +8,7 @@ const defaultCapabilities: Capabilities = {
   logs: true,
   portForward: true,
   secrets: true,
+  secretsUpdate: true,
   helmWrite: true,
   mcpEnabled: true,
 }
@@ -18,6 +19,7 @@ const restrictedCapabilities: Capabilities = {
   logs: false,
   portForward: false,
   secrets: false,
+  secretsUpdate: false,
   helmWrite: false,
   mcpEnabled: false,
 }
@@ -69,6 +71,10 @@ export function useCanPortForward(): boolean {
 
 export function useCanViewSecrets(): boolean {
   return useContext(CapabilitiesContext).secrets
+}
+
+export function useCanUpdateSecrets(): boolean {
+  return useContext(CapabilitiesContext).secretsUpdate
 }
 
 export function useCanHelmWrite(): boolean {

@@ -49,13 +49,14 @@ type PermissionCheckResult struct {
 
 // Capabilities represents the features available based on RBAC permissions
 type Capabilities struct {
-	Exec        bool                 `json:"exec"`                // Can create pods/exec (terminal feature)
-	Logs        bool                 `json:"logs"`                // Can get pods/log (log viewer)
-	PortForward bool                 `json:"portForward"`         // Can create pods/portforward
-	Secrets     bool                 `json:"secrets"`             // Can list secrets
-	HelmWrite   bool                 `json:"helmWrite"`           // Helm write ops (detected via secrets/create as sentinel RBAC check)
-	MCPEnabled  bool                 `json:"mcpEnabled"`          // MCP server is running
-	Resources   *ResourcePermissions `json:"resources,omitempty"` // Per-resource-type permissions
+	Exec          bool                 `json:"exec"`                // Can create pods/exec (terminal feature)
+	Logs          bool                 `json:"logs"`                // Can get pods/log (log viewer)
+	PortForward   bool                 `json:"portForward"`         // Can create pods/portforward
+	Secrets       bool                 `json:"secrets"`             // Can list secrets
+	SecretsUpdate bool                 `json:"secretsUpdate"`       // Can update secrets (inline editing)
+	HelmWrite     bool                 `json:"helmWrite"`           // Helm write ops (detected via secrets/create as sentinel RBAC check)
+	MCPEnabled    bool                 `json:"mcpEnabled"`          // MCP server is running
+	Resources     *ResourcePermissions `json:"resources,omitempty"` // Per-resource-type permissions
 }
 
 var (
@@ -94,7 +95,7 @@ func CheckCapabilities(ctx context.Context) (*Capabilities, error) {
 	if GetClient() == nil {
 		// Return all false if client not initialized (fail closed)
 		log.Printf("Warning: K8s client not initialized, returning restricted capabilities")
-		return &Capabilities{Exec: false, Logs: false, PortForward: false, Secrets: false, HelmWrite: false}, nil
+		return &Capabilities{Exec: false, Logs: false, PortForward: false, Secrets: false, SecretsUpdate: false, HelmWrite: false}, nil
 	}
 
 	// Use a background context so that HTTP request cancellation doesn't cause
@@ -120,6 +121,7 @@ func CheckCapabilities(ctx context.Context) (*Capabilities, error) {
 		{"pods/log", "get", &caps.Logs},
 		{"pods/portforward", "create", &caps.PortForward},
 		{"secrets", "list", &caps.Secrets},
+		{"secrets", "update", &caps.SecretsUpdate},
 		{"secrets", "create", &caps.HelmWrite},
 	}
 

@@ -1,12 +1,17 @@
-import { useState } from 'react'
-import { AlertTriangle, Copy, Check, Shield } from 'lucide-react'
+import { useState, useCallback, useRef, useEffect } from 'react'
+import { AlertTriangle, Copy, Check, Shield, Pencil, Save, XCircle, RefreshCw } from 'lucide-react'
 import { clsx } from 'clsx'
+import { stringify as yamlStringify } from 'yaml'
 import { Section, PropertyList, Property, AlertBanner } from '../drawer-components'
+import { ConfirmDialog } from '../../ui/ConfirmDialog'
 import type { SecretCertificateInfo, CertificateInfo } from '../../../types'
 
 interface SecretRendererProps {
   data: any
   certificateInfo?: SecretCertificateInfo
+  resourceData?: any
+  onSaveSecretValue?: (yaml: string) => Promise<void>
+  isSaving?: boolean
 }
 
 function formatDate(dateStr: string): string {
@@ -15,10 +20,15 @@ function formatDate(dateStr: string): string {
   return d.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })
 }
 
-export function SecretRenderer({ data, certificateInfo }: SecretRendererProps) {
+export function SecretRenderer({ data, certificateInfo, resourceData, onSaveSecretValue, isSaving }: SecretRendererProps) {
   const [revealed, setRevealed] = useState<Set<string>>(new Set())
   const [copied, setCopied] = useState<string | null>(null)
+  const [editingKey, setEditingKey] = useState<string | null>(null)
+  const [editValue, setEditValue] = useState('')
+  const [showSaveConfirm, setShowSaveConfirm] = useState(false)
+  const textareaRef = useRef<HTMLTextAreaElement>(null)
   const dataKeys = Object.keys(data.data || {})
+  const isImmutable = data.immutable === true
 
   function toggleReveal(key: string) {
     setRevealed(prev => {
@@ -30,7 +40,7 @@ export function SecretRenderer({ data, certificateInfo }: SecretRendererProps) {
 
   function decodeBase64(value: string): string {
     try {
-      return atob(value)
+      return decodeURIComponent(escape(atob(value)))
     } catch {
       return '[binary data]'
     }
@@ -45,6 +55,50 @@ export function SecretRenderer({ data, certificateInfo }: SecretRendererProps) {
       console.error('Failed to copy:', err)
     }
   }
+
+  function startEdit(key: string, decoded: string) {
+    setEditingKey(key)
+    setEditValue(decoded)
+  }
+
+  function cancelEdit() {
+    setEditingKey(null)
+    setEditValue('')
+    setShowSaveConfirm(false)
+  }
+
+  const handleSave = useCallback(async (key: string, newValue: string) => {
+    if (!onSaveSecretValue || !resourceData) return
+    const cleaned = structuredClone(resourceData)
+    delete cleaned.status
+    if (cleaned.metadata) {
+      delete cleaned.metadata.managedFields
+      delete cleaned.metadata.resourceVersion
+      delete cleaned.metadata.uid
+      delete cleaned.metadata.creationTimestamp
+      delete cleaned.metadata.generation
+    }
+    // Encode with UTF-8 support
+    cleaned.data[key] = btoa(unescape(encodeURIComponent(newValue)))
+    const yaml = yamlStringify(cleaned, { lineWidth: 0, indent: 2 })
+    try {
+      await onSaveSecretValue(yaml)
+      setEditingKey(null)
+      setEditValue('')
+      setShowSaveConfirm(false)
+    } catch {
+      // Error is handled by the mutation (toast)
+      setShowSaveConfirm(false)
+    }
+  }, [onSaveSecretValue, resourceData])
+
+  // Auto-resize textarea
+  useEffect(() => {
+    if (textareaRef.current) {
+      textareaRef.current.style.height = 'auto'
+      textareaRef.current.style.height = textareaRef.current.scrollHeight + 'px'
+    }
+  }, [editValue])
 
   const certs = certificateInfo?.certificates
   const leafCert = certs?.[0]
@@ -103,13 +157,24 @@ export function SecretRenderer({ data, certificateInfo }: SecretRendererProps) {
           {dataKeys.map((key) => {
             const decoded = decodeBase64(data.data[key])
             const isBinary = decoded === '[binary data]'
+            const isEditing = editingKey === key
+            const canEdit = onSaveSecretValue && !isImmutable && !isBinary
 
             return (
               <div key={key} className="bg-theme-elevated/30 rounded p-2">
                 <div className="flex items-center justify-between gap-2">
                   <span className="text-sm text-theme-text-primary truncate">{key}</span>
                   <div className="flex items-center gap-1 shrink-0">
-                    {revealed.has(key) && !isBinary && (
+                    {revealed.has(key) && !isBinary && !isEditing && canEdit && (
+                      <button
+                        onClick={() => startEdit(key, decoded)}
+                        className="p-1 text-theme-text-tertiary hover:text-blue-400 transition-colors"
+                        title="Edit value"
+                      >
+                        <Pencil className="w-3.5 h-3.5" />
+                      </button>
+                    )}
+                    {revealed.has(key) && !isBinary && !isEditing && (
                       <button
                         onClick={() => copyValue(key, decoded)}
                         className="p-1 text-theme-text-tertiary hover:text-theme-text-primary transition-colors"
@@ -122,19 +187,54 @@ export function SecretRenderer({ data, certificateInfo }: SecretRendererProps) {
                         )}
                       </button>
                     )}
-                    <button
-                      onClick={() => toggleReveal(key)}
-                      className="text-xs text-theme-text-secondary hover:text-theme-text-primary px-1.5 py-0.5 rounded hover:bg-theme-elevated transition-colors"
-                    >
-                      {revealed.has(key) ? 'Hide' : 'Reveal'}
-                    </button>
+                    {!isEditing && (
+                      <button
+                        onClick={() => toggleReveal(key)}
+                        className="text-xs text-theme-text-secondary hover:text-theme-text-primary px-1.5 py-0.5 rounded hover:bg-theme-elevated transition-colors"
+                      >
+                        {revealed.has(key) ? 'Hide' : 'Reveal'}
+                      </button>
+                    )}
                   </div>
                 </div>
-                {revealed.has(key) && (
+                {isEditing ? (
+                  <div className="mt-2">
+                    <textarea
+                      ref={textareaRef}
+                      value={editValue}
+                      onChange={(e) => setEditValue(e.target.value)}
+                      className="w-full bg-theme-base rounded p-2 text-xs text-theme-text-secondary font-mono border border-blue-500/50 focus:border-blue-500 focus:outline-none resize-none overflow-hidden whitespace-pre-wrap"
+                      style={{ minHeight: '60px' }}
+                      disabled={isSaving}
+                    />
+                    <div className="flex items-center gap-2 mt-2">
+                      <button
+                        onClick={() => setShowSaveConfirm(true)}
+                        disabled={isSaving}
+                        className="flex items-center gap-1 px-2.5 py-1 text-xs text-white bg-blue-600 hover:bg-blue-700 rounded transition-colors disabled:opacity-50"
+                      >
+                        {isSaving ? (
+                          <RefreshCw className="w-3 h-3 animate-spin" />
+                        ) : (
+                          <Save className="w-3 h-3" />
+                        )}
+                        {isSaving ? 'Saving...' : 'Save'}
+                      </button>
+                      <button
+                        onClick={cancelEdit}
+                        disabled={isSaving}
+                        className="flex items-center gap-1 px-2.5 py-1 text-xs text-theme-text-secondary hover:text-theme-text-primary rounded hover:bg-theme-elevated transition-colors disabled:opacity-50"
+                      >
+                        <XCircle className="w-3 h-3" />
+                        Cancel
+                      </button>
+                    </div>
+                  </div>
+                ) : revealed.has(key) ? (
                   <pre className="mt-2 bg-theme-base rounded p-2 text-xs text-theme-text-secondary overflow-x-auto max-h-40 whitespace-pre-wrap">
                     {decoded}
                   </pre>
-                )}
+                ) : null}
               </div>
             )
           })}
@@ -148,6 +248,20 @@ export function SecretRenderer({ data, certificateInfo }: SecretRendererProps) {
         <AlertTriangle className="w-4 h-4" />
         Secret values are sensitive. Be careful when revealing.
       </div>
+
+      {editingKey && (
+        <ConfirmDialog
+          open={showSaveConfirm}
+          onClose={() => setShowSaveConfirm(false)}
+          onConfirm={() => handleSave(editingKey, editValue)}
+          title="Update Secret"
+          message={`Update key "${editingKey}" in secret "${data.metadata?.name || 'unknown'}"?`}
+          details="This will modify the secret value in the cluster immediately."
+          confirmLabel="Update"
+          variant="warning"
+          isLoading={isSaving}
+        />
+      )}
     </>
   )
 }

@@ -134,7 +134,7 @@ import {
 } from './renderers'
 import { useOpenTerminal, useOpenLogs, useOpenWorkloadLogs } from '../dock'
 import { PortForwardButton } from '../portforward/PortForwardButton'
-import { useCanExec, useCanViewLogs, useCanPortForward } from '../../contexts/CapabilitiesContext'
+import { useCanExec, useCanViewLogs, useCanPortForward, useCanUpdateSecrets } from '../../contexts/CapabilitiesContext'
 import { useToast } from '../ui/Toast'
 import { CodeViewer } from '../ui/CodeViewer'
 import { YamlEditor } from '../ui/YamlEditor'
@@ -308,6 +308,24 @@ export function ResourceDetailDrawer({ resource, onClose, onNavigate }: Resource
     setYamlErrors(errors)
   }, [])
 
+  // RBAC: check if user can update secrets (hides inline edit buttons when denied)
+  const canUpdateSecrets = useCanUpdateSecrets()
+
+  // Save a single secret value inline (used by SecretRenderer)
+  const handleSaveSecretValue = useCallback(async (yaml: string) => {
+    try {
+      await updateResource.mutateAsync({
+        kind: resource.kind,
+        namespace: resource.namespace,
+        name: resource.name,
+        yaml,
+      })
+      setTimeout(() => refetch(), 1000)
+    } catch {
+      // Error is handled by the mutation (toast)
+    }
+  }, [updateResource, resource, refetch])
+
   const headerHeight = 49
 
   return (
@@ -373,6 +391,8 @@ export function ResourceDetailDrawer({ resource, onClose, onNavigate }: Resource
             onCopy={copyToClipboard}
             copied={copied}
             onNavigate={handleNavigateToRelated}
+            onSaveSecretValue={canUpdateSecrets ? handleSaveSecretValue : undefined}
+            isSavingSecret={updateResource.isPending}
           />
         )}
       </div>
@@ -1534,9 +1554,11 @@ interface ResourceContentProps {
   onCopy: (text: string, key: string) => void
   copied: string | null
   onNavigate?: (ref: ResourceRef) => void
+  onSaveSecretValue?: (yaml: string) => Promise<void>
+  isSavingSecret?: boolean
 }
 
-function ResourceContent({ resource, data, relationships, certificateInfo, onCopy, copied, onNavigate }: ResourceContentProps) {
+function ResourceContent({ resource, data, relationships, certificateInfo, onCopy, copied, onNavigate, onSaveSecretValue, isSavingSecret }: ResourceContentProps) {
   const kind = resource.kind.toLowerCase()
 
   // Fetch events for this resource
@@ -1577,7 +1599,7 @@ function ResourceContent({ resource, data, relationships, certificateInfo, onCop
       {kind === 'services' && <ServiceRenderer data={data} onCopy={onCopy} copied={copied} />}
       {kind === 'ingresses' && <IngressRenderer data={data} onNavigate={onNavigate} />}
       {kind === 'configmaps' && <ConfigMapRenderer data={data} />}
-      {kind === 'secrets' && <SecretRenderer data={data} certificateInfo={certificateInfo} />}
+      {kind === 'secrets' && <SecretRenderer data={data} certificateInfo={certificateInfo} resourceData={data} onSaveSecretValue={onSaveSecretValue} isSaving={isSavingSecret} />}
       {kind === 'jobs' && <JobRenderer data={data} />}
       {kind === 'cronjobs' && <CronJobRenderer data={data} onNavigate={onNavigate} />}
       {(kind === 'hpas' || kind === 'horizontalpodautoscalers') && <HPARenderer data={data} onNavigate={onNavigate} />}

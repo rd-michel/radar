@@ -24,12 +24,13 @@ export interface ResourcePermissions {
 
 // Feature capabilities based on RBAC permissions
 export interface Capabilities {
-  exec: boolean        // Terminal feature (pods/exec)
-  logs: boolean        // Log viewer (pods/log)
-  portForward: boolean // Port forwarding (pods/portforward)
-  secrets: boolean     // List secrets
-  helmWrite: boolean   // Helm write operations (install, upgrade, rollback, uninstall, apply values)
-  mcpEnabled: boolean  // MCP server is running
+  exec: boolean           // Terminal feature (pods/exec)
+  logs: boolean           // Log viewer (pods/log)
+  portForward: boolean    // Port forwarding (pods/portforward)
+  secrets: boolean        // List secrets
+  secretsUpdate: boolean  // Update secrets (inline editing)
+  helmWrite: boolean      // Helm write operations (install, upgrade, rollback, uninstall, apply values)
+  mcpEnabled: boolean     // MCP server is running
   resources?: ResourcePermissions // Per-resource-type permissions
 }
 
