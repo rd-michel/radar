@@ -417,7 +417,7 @@ GET  /api/ai/resources/{kind}/{ns}/{name}     # Minified single resource (verbos
 - Dynamic caching for CRDs and custom resource types via API discovery
 - Memory-efficient with field stripping (removes managed fields, last-applied annotations)
 - Change notifications via channel for real-time SSE updates
-- Supports: Pods, Services, Deployments, DaemonSets, StatefulSets, ReplicaSets, Ingresses, ConfigMaps, Secrets, Events, Jobs, CronJobs, HorizontalPodAutoscalers, PersistentVolumeClaims, Nodes, Namespaces
+- Supports: Pods, Services, Deployments, DaemonSets, StatefulSets, ReplicaSets, Ingresses, ConfigMaps, Secrets, Events, Jobs, CronJobs, HorizontalPodAutoscalers, PersistentVolumeClaims, PersistentVolumes, StorageClasses, PodDisruptionBudgets, Nodes, Namespaces
 
 ### Server-Sent Events (SSE)
 - Central `SSEBroadcaster` manages connected clients
@@ -439,7 +439,7 @@ GET  /api/ai/resources/{kind}/{ns}/{name}     # Minified single resource (verbos
 - Two view modes:
   - `traffic`: Network flow (Ingress/Gateway → HTTPRoute → Service → Pod)
   - `resources`: Full hierarchy (Deployment → ReplicaSet → Pod)
-- Node types: Ingress, Gateway, HTTPRoute, GRPCRoute, TCPRoute, TLSRoute, Service, Deployment, DaemonSet, StatefulSet, ReplicaSet, Pod, Job, CronJob, ConfigMap, Secret, HorizontalPodAutoscaler, PersistentVolumeClaim
+- Node types: Ingress, Gateway, HTTPRoute, GRPCRoute, TCPRoute, TLSRoute, Service, Deployment, DaemonSet, StatefulSet, ReplicaSet, Pod, Job, CronJob, ConfigMap, Secret, HorizontalPodAutoscaler, PersistentVolumeClaim, PersistentVolume, StorageClass, PodDisruptionBudget, VerticalPodAutoscaler
 - GitOps nodes: Application (ArgoCD), Kustomization, HelmRelease, GitRepository (FluxCD)
   - Connected to managed resources via status.resources (ArgoCD) or status.inventory (FluxCD Kustomization)
   - HelmRelease connects to resources via FluxCD labels (`helm.toolkit.fluxcd.io/name`) or standard Helm label (`app.kubernetes.io/instance`). Matches Deployment, Service, StatefulSet, DaemonSet, Job, CronJob, Rollout.
@@ -453,7 +453,7 @@ GET  /api/ai/resources/{kind}/{ns}/{name}     # Minified single resource (verbos
 
 ### Resource Relationships
 - Computed at query time for resource detail views
-- Tracks: parent (owner), children (owned), deployment (grandparent shortcut for Pods owned by ReplicaSets), config (ConfigMaps/Secrets), network (Services/Ingresses/Gateways/Routes)
+- Tracks: parent (owner), children (owned), deployment (grandparent shortcut for Pods owned by ReplicaSets), config (ConfigMaps/Secrets), network (Services/Ingresses/Gateways/Routes), scalers (HPA/VPA/KEDA), policies (PDB), storage (PVC→PV→StorageClass)
 - Used for topology edges and change propagation
 
 ### AI Context Minification
