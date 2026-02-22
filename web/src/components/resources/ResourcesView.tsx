@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useEffect, useCallback, useRef, forwardRef, useContext } from 'react'
 import { useRefreshAnimation } from '../../hooks/useRefreshAnimation'
-import { useLocation } from 'react-router-dom'
+import { useLocation, useNavigate } from 'react-router-dom'
 import { useQueries } from '@tanstack/react-query'
 import { ApiError, isForbiddenError, useSecretCertExpiry, useTopPodMetrics, useTopNodeMetrics } from '../../api/client'
 import type { TopPodMetrics, TopNodeMetrics } from '../../api/client'
@@ -888,11 +888,12 @@ interface ResourcesViewProps {
 // Default selected kind
 const DEFAULT_KIND_INFO: SelectedKindInfo = { name: 'pods', kind: 'Pod', group: '' }
 
-// Read initial state from URL
+// Read initial state from URL — kind is in the path: /resources/{kind}
 function getInitialKindFromURL(): SelectedKindInfo {
-  const params = new URLSearchParams(window.location.search)
-  const kind = params.get('kind')
-  const group = params.get('apiGroup') || ''
+  // Read kind from URL path segment: /resources/{kind}
+  const pathSegments = window.location.pathname.replace(/^\//, '').split('/')
+  const kind = pathSegments.length > 1 && pathSegments[0] === 'resources' ? pathSegments[1] : null
+  const group = new URLSearchParams(window.location.search).get('apiGroup') || ''
   if (kind) {
     // Find matching resource from CORE_RESOURCES or use as-is
     const coreMatch = CORE_RESOURCES.find(r => r.kind === kind || r.name === kind)
@@ -961,6 +962,10 @@ export function ResourcesView({ namespaces, selectedResource, onResourceClick, o
   // Track if this is the initial mount to avoid re-syncing on first render
   const isInitialMount = useRef(true)
   const isSyncingFromURL = useRef(false)
+  // Track whether the initial mount effect has processed the ?resource= param
+  const hasProcessedInitialResource = useRef(false)
+  // Set by sidebar kind change to push a browser history entry (vs replace for filter changes)
+  const shouldPushHistory = useRef(false)
 
   // Ref to selected row for scrolling into view on deeplink
   const selectedRowRef = useRef<HTMLTableRowElement>(null)
@@ -1216,7 +1221,9 @@ export function ResourcesView({ namespaces, selectedResource, onResourceClick, o
       console.debug('[filters] URL sync: resetting isSyncingFromURL flag')
       isSyncingFromURL.current = false
     })
-  }, [location.search]) // Re-run when URL search params change
+  }, [location.search, location.pathname]) // Re-run when URL path or search params change
+
+  const navigate = useNavigate()
 
   // Update URL with all state
   const updateURL = useCallback((
@@ -1226,13 +1233,14 @@ export function ResourcesView({ namespaces, selectedResource, onResourceClick, o
     problems: string[],
     showInactive: boolean,
     resourceNs?: string,
-    resourceName?: string
+    resourceName?: string,
+    pushHistory?: boolean
   ) => {
     // Preserve existing params (like namespace from App)
     const params = new URLSearchParams(window.location.search)
 
-    // Set/update resources-specific params
-    params.set('kind', kindInfo.kind)
+    // Kind is now in the path (/resources/{kind}), not a query param
+    params.delete('kind')
     if (kindInfo.group) {
       params.set('apiGroup', kindInfo.group)
     } else {
@@ -1266,16 +1274,27 @@ export function ResourcesView({ namespaces, selectedResource, onResourceClick, o
       params.delete('resource')
     }
 
-    const newURL = `${window.location.pathname}?${params.toString()}`
-    console.debug('[filters] updateURL:', newURL)
-    window.history.replaceState({}, '', newURL)
-  }, [])
+    const newPath = `/resources/${kindInfo.name}`
+    const queryStr = params.toString()
+    const newURL = queryStr ? `${newPath}?${queryStr}` : newPath
+    console.debug('[filters] updateURL:', newURL, pushHistory ? '(push)' : '(replace)')
+    if (pushHistory) {
+      navigate({ pathname: newPath, search: queryStr }, { replace: false })
+    } else {
+      window.history.replaceState({}, '', newURL)
+    }
+  }, [navigate])
 
   // Update URL when any filter changes
   useEffect(() => {
     // Skip URL update if we're syncing FROM the URL (e.g., browser back button)
     if (isSyncingFromURL.current) {
       console.debug('[filters] URL update effect: skipped (syncing from URL)')
+      return
+    }
+    // Skip on initial mount so we don't strip ?resource= before the mount effect reads it
+    if (!hasProcessedInitialResource.current) {
+      console.debug('[filters] URL update effect: skipped (waiting for initial resource processing)')
       return
     }
     // Skip URL update if selectedResource's kind doesn't match selectedKind (still syncing)
@@ -1286,8 +1305,11 @@ export function ResourcesView({ namespaces, selectedResource, onResourceClick, o
         return // Wait for kind sync effect to run first
       }
     }
-    console.debug('[filters] URL update effect: writing state to URL', { kind: selectedKind.name, columnFilters, searchTerm, problemFilters })
-    updateURL(selectedKind, searchTerm, columnFilters, problemFilters, showInactiveReplicaSets, selectedResource?.namespace, selectedResource?.name)
+    // Push history when kind changes (so browser back/forward works), replace for filter changes
+    const pushHistory = shouldPushHistory.current
+    shouldPushHistory.current = false
+    console.debug('[filters] URL update effect: writing state to URL', { kind: selectedKind.name, columnFilters, searchTerm, problemFilters, pushHistory })
+    updateURL(selectedKind, searchTerm, columnFilters, problemFilters, showInactiveReplicaSets, selectedResource?.namespace, selectedResource?.name, pushHistory)
   }, [selectedKind, searchTerm, columnFilters, problemFilters, showInactiveReplicaSets, selectedResource, updateURL])
 
   // Handle resource click from URL on mount
@@ -1300,6 +1322,8 @@ export function ResourcesView({ namespaces, selectedResource, onResourceClick, o
         onResourceClick({ kind: selectedKind.name, namespace: ns, name, group: selectedKind.group })
       }
     }
+    // Signal that initial resource param has been processed — URL update effect can now run
+    hasProcessedInitialResource.current = true
   }, []) // Only on mount
 
   // Fetch API resources for dynamic sidebar (must be above effects that reference apiResources)
@@ -2153,6 +2177,7 @@ export function ResourcesView({ namespaces, selectedResource, onResourceClick, o
                         isPinned={true}
                         onTogglePin={() => togglePin(p)}
                         onClick={() => {
+                          shouldPushHistory.current = true
                           setSelectedKind({ name: p.name, kind: p.kind, group: p.group })
                           onKindChange?.()
                         }}
@@ -2202,6 +2227,7 @@ export function ResourcesView({ namespaces, selectedResource, onResourceClick, o
                           isPinned={isPinned(resource.name, resource.group)}
                           onTogglePin={() => togglePin({ name: resource.name, kind: resource.kind, group: resource.group })}
                           onClick={() => {
+                            shouldPushHistory.current = true
                             setSelectedKind({ name: resource.name, kind: resource.kind, group: resource.group })
                             onKindChange?.()
                           }}
@@ -2228,6 +2254,7 @@ export function ResourcesView({ namespaces, selectedResource, onResourceClick, o
                 <button
                   key={type.kind}
                   onClick={() => {
+                    shouldPushHistory.current = true
                     setSelectedKind({ name: type.kind, kind: type.label, group: '' })
                     onKindChange?.()
                   }}
