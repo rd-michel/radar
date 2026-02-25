@@ -584,30 +584,25 @@ func (s *Server) handleNamespaces(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Get allowed namespaces for user (triggers discovery if needed)
+	allowed := s.parseNamespacesForUser(r)
+	var allowedSet map[string]bool
+	if len(allowed) > 0 {
+		allowedSet = make(map[string]bool, len(allowed))
+		for _, ns := range allowed {
+			allowedSet[ns] = true
+		}
+	}
+
 	result := make([]map[string]any, 0, len(namespaces))
 	for _, ns := range namespaces {
+		if allowedSet != nil && !allowedSet[ns.Name] {
+			continue
+		}
 		result = append(result, map[string]any{
 			"name":   ns.Name,
 			"status": string(ns.Status.Phase),
 		})
-	}
-
-	// Filter namespaces per user when auth is enabled
-	if user := auth.UserFromContext(r.Context()); user != nil && s.permCache != nil {
-		perms := s.permCache.Get(user.Username)
-		if perms != nil && perms.AllowedNamespaces != nil {
-			allowedSet := make(map[string]bool, len(perms.AllowedNamespaces))
-			for _, ns := range perms.AllowedNamespaces {
-				allowedSet[ns] = true
-			}
-			filtered := make([]map[string]any, 0, len(result))
-			for _, ns := range result {
-				if name, ok := ns["name"].(string); ok && allowedSet[name] {
-					filtered = append(filtered, ns)
-				}
-			}
-			result = filtered
-		}
 	}
 
 	s.writeJSON(w, result)
