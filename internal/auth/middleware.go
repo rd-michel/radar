@@ -13,6 +13,7 @@ type contextKey struct{}
 // Authenticate returns a chi middleware that extracts user identity from
 // proxy headers or session cookies. Returns 401 if unauthenticated.
 // Exempt paths (health, auth endpoints) are passed through.
+// Soft-auth paths (e.g. /api/auth/me) attempt auth but don't 401 on failure.
 func Authenticate(cfg Config) func(http.Handler) http.Handler {
 	cfg.Defaults()
 	secure := cfg.Mode == "oidc" // Secure cookies for OIDC (typically behind TLS)
@@ -56,6 +57,12 @@ func Authenticate(cfg Config) func(http.Handler) http.Handler {
 				}
 			}
 
+			// Soft-auth paths: pass through without user (handler decides response)
+			if isSoftAuthPath(r.URL.Path) {
+				next.ServeHTTP(w, r)
+				return
+			}
+
 			// No valid auth found
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusUnauthorized)
@@ -78,7 +85,6 @@ func UserFromContext(ctx context.Context) *User {
 func isExemptPath(path string) bool {
 	exemptPrefixes := []string{
 		"/api/health",
-		"/api/auth/",
 		"/auth/",
 	}
 	for _, prefix := range exemptPrefixes {
@@ -91,6 +97,12 @@ func isExemptPath(path string) bool {
 		return true
 	}
 	return false
+}
+
+// isSoftAuthPath returns true for paths that should attempt auth but not
+// require it. These endpoints work with or without a user in context.
+func isSoftAuthPath(path string) bool {
+	return path == "/api/auth/me"
 }
 
 // AuditLog logs a write operation with user identity
