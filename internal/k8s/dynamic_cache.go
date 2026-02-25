@@ -799,7 +799,10 @@ func (d *DynamicResourceCache) WarmupParallel(gvrs []schema.GroupVersionResource
 	}
 }
 
-// Stop gracefully shuts down the dynamic cache
+// Stop gracefully shuts down the dynamic cache.
+// Closing stopCh signals all informers to stop. factory.Shutdown() is run in
+// a background goroutine so we don't block context switches when informers are
+// stuck in HTTP calls against a cluster with expired credentials.
 func (d *DynamicResourceCache) Stop() {
 	if d == nil {
 		return
@@ -817,7 +820,20 @@ func (d *DynamicResourceCache) Stop() {
 		d.discoveryMu.Unlock()
 
 		close(d.stopCh)
-		d.factory.Shutdown()
+		// Let informers drain in background — don't block context switch
+		go func() {
+			done := make(chan struct{})
+			go func() {
+				d.factory.Shutdown()
+				close(done)
+			}()
+			select {
+			case <-done:
+				log.Println("Dynamic resource cache stopped cleanly")
+			case <-time.After(5 * time.Second):
+				log.Println("Dynamic resource cache: informers still draining in background")
+			}
+		}()
 	})
 }
 

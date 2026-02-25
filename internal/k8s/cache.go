@@ -1044,7 +1044,16 @@ func (c *ResourceCache) ChangesRaw() chan ResourceChange {
 	return c.changes
 }
 
-// Stop gracefully shuts down the cache
+// Stop gracefully shuts down the cache.
+// Closing stopCh signals all informers to stop. factory.Shutdown() is run in
+// a background goroutine so we don't block context switches when informers are
+// stuck in HTTP calls against a cluster with expired credentials.
+//
+// The changes channel is NOT closed here because informer handlers may still
+// be sending to it (the sends are non-blocking select/default, but sending to
+// a closed channel panics). The dynamic cache also shares this channel via
+// ChangesRaw(). The channel will be abandoned and GC'd once all informer
+// goroutines exit and no references remain.
 func (c *ResourceCache) Stop() {
 	if c == nil {
 		return
@@ -1053,8 +1062,20 @@ func (c *ResourceCache) Stop() {
 	c.stopOnce.Do(func() {
 		log.Println("Stopping resource cache")
 		close(c.stopCh)
-		c.factory.Shutdown()
-		close(c.changes)
+		// Let informers drain in background — don't block context switch
+		go func() {
+			done := make(chan struct{})
+			go func() {
+				c.factory.Shutdown()
+				close(done)
+			}()
+			select {
+			case <-done:
+				log.Println("Resource cache stopped cleanly")
+			case <-time.After(5 * time.Second):
+				log.Println("Resource cache: informers still draining in background")
+			}
+		}()
 	})
 }
 

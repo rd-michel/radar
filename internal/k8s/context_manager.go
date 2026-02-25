@@ -153,15 +153,20 @@ func TestClusterConnection(ctx context.Context) error {
 }
 
 // PerformContextSwitch orchestrates a full context switch:
-// 1. Tears down all subsystems
+// 1. Tears down all subsystems (non-blocking — old informers drain in background)
 // 2. Switches the K8s client to the new context
 // 3. Tests connectivity to ensure cluster is reachable
 // 4. Reinitializes all subsystems (same sequence as initial boot)
 // 5. Notifies all registered callbacks
+//
+// Individual steps have their own timeouts: teardown is non-blocking,
+// connection test has ConnectionTestTimeout (5s), and cache sync has its own
+// deadline. ContextSwitchTimeout is available for future use at the handler
+// level if needed.
 func PerformContextSwitch(newContext string) error {
 	log.Printf("Performing context switch to %q", newContext)
 
-	// Step 1: Tear down all subsystems
+	// Step 1: Tear down all subsystems (non-blocking — informers drain in background)
 	reportProgress("Stopping caches...")
 	ResetAllSubsystems()
 

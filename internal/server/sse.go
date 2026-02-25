@@ -26,6 +26,12 @@ type SSEBroadcaster struct {
 	mu         sync.RWMutex
 	stopCh     chan struct{}
 
+	// watchStopCh is closed to signal the current watchResourceChanges goroutine
+	// to exit. A new channel is created each time the watcher is restarted
+	// (e.g., after a context switch creates a new resource cache).
+	watchStopCh chan struct{}
+	watchMu     sync.Mutex // protects watchStopCh
+
 	// Cached topology for relationship lookups (updated on each topology rebuild)
 	cachedTopology   *topology.Topology
 	cachedTopologyMu sync.RWMutex
@@ -64,10 +70,11 @@ func safeSend(ch chan SSEEvent, event SSEEvent) {
 // NewSSEBroadcaster creates a new SSE broadcaster
 func NewSSEBroadcaster() *SSEBroadcaster {
 	return &SSEBroadcaster{
-		clients:    make(map[chan SSEEvent]ClientInfo),
-		register:   make(chan clientRegistration),
-		unregister: make(chan chan SSEEvent),
-		stopCh:     make(chan struct{}),
+		clients:     make(map[chan SSEEvent]ClientInfo),
+		register:    make(chan clientRegistration),
+		unregister:  make(chan chan SSEEvent),
+		stopCh:      make(chan struct{}),
+		watchStopCh: make(chan struct{}),
 	}
 }
 
@@ -150,6 +157,12 @@ func (b *SSEBroadcaster) registerContextSwitchCallback() {
 		b.cachedTopology = nil
 		b.cachedTopologyMu.Unlock()
 
+		// Restart the resource change watcher for the new cache.
+		// The old watcher is stuck on the previous cache's changes channel
+		// (which is never closed to avoid panics from in-flight informer sends).
+		// Signal it to exit, then start a new one bound to the new cache.
+		b.restartResourceWatcher()
+
 		// Broadcast context_changed event to all clients
 		b.mu.RLock()
 		clientCount := len(b.clients)
@@ -228,7 +241,20 @@ func (b *SSEBroadcaster) run() {
 	}
 }
 
-// watchResourceChanges listens for K8s resource changes and broadcasts topology updates
+// restartResourceWatcher stops the current watchResourceChanges goroutine and
+// starts a new one bound to the current resource cache's changes channel.
+func (b *SSEBroadcaster) restartResourceWatcher() {
+	b.watchMu.Lock()
+	close(b.watchStopCh)
+	b.watchStopCh = make(chan struct{})
+	b.watchMu.Unlock()
+
+	go b.watchResourceChanges()
+}
+
+// watchResourceChanges listens for K8s resource changes and broadcasts topology updates.
+// Exits when b.stopCh (server shutdown) or b.watchStopCh (context switch restart) is closed,
+// or when the changes channel is closed.
 func (b *SSEBroadcaster) watchResourceChanges() {
 	cache := k8s.GetResourceCache()
 	if cache == nil {
@@ -241,6 +267,12 @@ func (b *SSEBroadcaster) watchResourceChanges() {
 		return
 	}
 
+	// Capture the current watchStopCh — restartResourceWatcher will close this
+	// and create a new one, so we must read it under the lock once at startup.
+	b.watchMu.Lock()
+	watchStop := b.watchStopCh
+	b.watchMu.Unlock()
+
 	// Debounce changes - wait for 100ms of quiet before sending topology update
 	debounceTimer := time.NewTimer(0)
 	<-debounceTimer.C // drain initial timer
@@ -249,6 +281,9 @@ func (b *SSEBroadcaster) watchResourceChanges() {
 	for {
 		select {
 		case <-b.stopCh:
+			return
+
+		case <-watchStop:
 			return
 
 		case change, ok := <-changes:
