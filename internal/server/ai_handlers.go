@@ -34,6 +34,10 @@ func (s *Server) handleAIListResources(w http.ResponseWriter, r *http.Request) {
 	}
 	kind := chi.URLParam(r, "kind")
 	namespaces := s.parseNamespacesForUser(r)
+	if noNamespaceAccess(namespaces) {
+		s.writeJSON(w, []any{})
+		return
+	}
 	group := r.URL.Query().Get("group")
 	level := parseVerbosity(r, aicontext.LevelSummary)
 

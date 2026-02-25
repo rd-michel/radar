@@ -74,6 +74,10 @@ func (s *Server) handleSecretCertExpiry(w http.ResponseWriter, r *http.Request) 
 	}
 
 	namespaces := s.parseNamespacesForUser(r)
+	if noNamespaceAccess(namespaces) {
+		s.writeJSON(w, map[string]CertExpiry{})
+		return
+	}
 	var secrets []*corev1.Secret
 	var listErr error
 	if len(namespaces) == 1 {

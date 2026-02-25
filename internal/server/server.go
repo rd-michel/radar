@@ -502,10 +502,19 @@ func (s *Server) handleCapabilities(w http.ResponseWriter, r *http.Request) {
 }
 
 // parseNamespacesForUser parses namespace query params and filters by user permissions.
-// This is the preferred method when a *Server and *http.Request are available.
+// Returns nil for "all namespaces" (no filter), a populated slice for specific namespaces,
+// or an empty non-nil slice when the user has no namespace access.
+// Use noNamespaceAccess() to check the no-access case.
 func (s *Server) parseNamespacesForUser(r *http.Request) []string {
 	namespaces := parseNamespaces(r.URL.Query())
 	return s.getUserNamespaces(r, namespaces)
+}
+
+// noNamespaceAccess returns true when a namespace filter explicitly grants no access
+// (non-nil empty slice from auth filtering). Handlers with custom namespace logic
+// should check this and return empty results.
+func noNamespaceAccess(namespaces []string) bool {
+	return namespaces != nil && len(namespaces) == 0
 }
 
 // parseNamespaces parses the namespace filter from query parameters.
@@ -544,6 +553,10 @@ func (s *Server) handleTopology(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	namespaces := s.parseNamespacesForUser(r)
+	if noNamespaceAccess(namespaces) {
+		s.writeJSON(w, map[string]any{"nodes": []any{}, "edges": []any{}})
+		return
+	}
 	viewMode := r.URL.Query().Get("view")
 
 	opts := topology.DefaultBuildOptions()
@@ -634,6 +647,10 @@ func (s *Server) handleListResources(w http.ResponseWriter, r *http.Request) {
 	}
 	kind := chi.URLParam(r, "kind")
 	namespaces := s.parseNamespacesForUser(r)
+	if noNamespaceAccess(namespaces) {
+		s.writeJSON(w, []any{})
+		return
+	}
 	group := r.URL.Query().Get("group") // API group for CRD disambiguation
 
 	cache := k8s.GetResourceCache()
@@ -648,7 +665,7 @@ func (s *Server) handleListResources(w http.ResponseWriter, r *http.Request) {
 	// listPerNs is a helper that merges results across multiple namespaces.
 	// listAll returns all items; listNs returns items for a single namespace.
 	listPerNs := func(listAll func() (any, error), listNs func(string) (any, error)) (any, error) {
-		if len(namespaces) == 0 {
+		if namespaces == nil {
 			return listAll()
 		}
 		if len(namespaces) == 1 {
@@ -1333,7 +1350,10 @@ func (s *Server) handleEvents(w http.ResponseWriter, r *http.Request) {
 	var events any
 	var err error
 
-	if len(namespaces) == 1 {
+	if noNamespaceAccess(namespaces) {
+		s.writeJSON(w, []any{})
+		return
+	} else if len(namespaces) == 1 {
 		events, err = eventsLister.Events(namespaces[0]).List(labels.Everything())
 	} else if len(namespaces) > 1 {
 		var merged []any
@@ -1365,6 +1385,10 @@ func (s *Server) handleChanges(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	namespaces := s.parseNamespacesForUser(r)
+	if noNamespaceAccess(namespaces) {
+		s.writeJSON(w, []any{})
+		return
+	}
 	kind := r.URL.Query().Get("kind")
 	sinceStr := r.URL.Query().Get("since")
 	limitStr := r.URL.Query().Get("limit")
@@ -2059,8 +2083,13 @@ func (s *Server) handleSSE(w http.ResponseWriter, r *http.Request) {
 	q := r.URL.Query()
 	q.Del("namespace")
 	q.Del("namespaces")
-	if len(namespaces) > 0 {
-		q.Set("namespaces", strings.Join(namespaces, ","))
+	if namespaces != nil {
+		if len(namespaces) == 0 {
+			// User has no namespace access — use impossible filter to block all events
+			q.Set("namespaces", "__no_access__")
+		} else {
+			q.Set("namespaces", strings.Join(namespaces, ","))
+		}
 	}
 	r.URL.RawQuery = q.Encode()
 	s.broadcaster.HandleSSE(w, r)

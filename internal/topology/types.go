@@ -132,10 +132,11 @@ type BuildOptions struct {
 	IncludeGenericCRDs bool     // Include CRDs with owner refs to topology nodes (default: true)
 }
 
-// MatchesNamespace returns true if ns is in the allowed list, or if the list is empty (all allowed).
+// MatchesNamespace returns true if ns is in the allowed list.
+// nil means no filter (all namespaces match). An explicit empty slice means nothing matches.
 // This is a standalone function that can be used by any code needing namespace filtering.
 func MatchesNamespace(namespaces []string, ns string) bool {
-	if len(namespaces) == 0 {
+	if namespaces == nil {
 		return true
 	}
 	return slices.Contains(namespaces, ns)

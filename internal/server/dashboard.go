@@ -204,6 +204,10 @@ type DashboardHelmRelease struct {
 func (s *Server) handleDashboard(w http.ResponseWriter, r *http.Request) {
 	dashStart := time.Now()
 	namespaces := s.parseNamespacesForUser(r)
+	if noNamespaceAccess(namespaces) {
+		s.writeJSON(w, DashboardResponse{})
+		return
+	}
 	// For backward compat with single namespace string in internal functions
 	namespace := ""
 	if len(namespaces) == 1 {
@@ -297,6 +301,10 @@ func (s *Server) handleDashboardHelm(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	namespaces := s.parseNamespacesForUser(r)
+	if noNamespaceAccess(namespaces) {
+		s.writeJSON(w, DashboardHelmSummary{})
+		return
+	}
 	namespace := ""
 	if len(namespaces) == 1 {
 		namespace = namespaces[0]
@@ -864,7 +872,7 @@ func (s *Server) getDashboardRecentChanges(ctx context.Context, namespaces []str
 func (s *Server) getDashboardTopologySummary(namespaces []string) DashboardTopologySummary {
 	// Use cached topology only when no namespace filter is active,
 	// since the cached topology's namespace scope may not match the request.
-	if len(namespaces) == 0 {
+	if namespaces == nil {
 		if cachedTopo := s.broadcaster.GetCachedTopology(); cachedTopo != nil {
 			return DashboardTopologySummary{
 				NodeCount: len(cachedTopo.Nodes),

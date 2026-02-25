@@ -66,8 +66,10 @@ func DiscoverNamespaces(ctx context.Context, client kubernetes.Interface, userna
 	// Step 1: Check cluster-wide "list pods" — if allowed, user is effectively cluster-admin
 	allowed, err := subjectCanI(ctx, client, username, groups, "", "", "pods", "list")
 	if err != nil {
+		log.Printf("[auth] DiscoverNamespaces: cluster-scope SAR failed for %s: %v", username, err)
 		return nil, err
 	}
+	log.Printf("[auth] DiscoverNamespaces: user=%s cluster-scope list pods = %v", username, allowed)
 	if allowed {
 		return nil, nil // nil = all namespaces
 	}
@@ -110,7 +112,7 @@ func DiscoverNamespaces(ctx context.Context, client kubernetes.Interface, userna
 		close(results)
 	}()
 
-	var allowed_ns []string
+	allowed_ns := make([]string, 0) // empty (not nil) = no access; nil = all namespaces
 	for r := range results {
 		if r.allowed {
 			allowed_ns = append(allowed_ns, r.namespace)
