@@ -7,6 +7,7 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/kubernetes"
 )
 
 // EphemeralContainerOptions configures debug container creation
@@ -23,7 +24,15 @@ const DefaultDebugImage = "busybox:latest"
 
 // CreateEphemeralContainer adds an ephemeral debug container to a pod
 func CreateEphemeralContainer(ctx context.Context, opts EphemeralContainerOptions) (*corev1.EphemeralContainer, error) {
-	client := GetClient()
+	return CreateEphemeralContainerWithClient(ctx, opts, nil)
+}
+
+// CreateEphemeralContainerWithClient adds an ephemeral debug container using the given client.
+// If client is nil, uses the shared client.
+func CreateEphemeralContainerWithClient(ctx context.Context, opts EphemeralContainerOptions, client kubernetes.Interface) (*corev1.EphemeralContainer, error) {
+	if client == nil {
+		client = GetClient()
+	}
 	if client == nil {
 		return nil, fmt.Errorf("kubernetes client not initialized")
 	}

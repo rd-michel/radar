@@ -32,6 +32,8 @@ export interface Capabilities {
   helmWrite: boolean      // Helm write operations (install, upgrade, rollback, uninstall, apply values)
   mcpEnabled: boolean     // MCP server is running
   resources?: ResourcePermissions // Per-resource-type permissions
+  authEnabled?: boolean   // Auth is enabled on the backend
+  username?: string       // Authenticated user's username (when auth enabled)
 }
 
 // Core node kinds that have specific UI handling

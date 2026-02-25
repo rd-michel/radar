@@ -16,6 +16,7 @@ import (
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/tools/remotecommand"
 
+	"github.com/skyhook-io/radar/internal/auth"
 	"github.com/skyhook-io/radar/internal/k8s"
 )
 
@@ -149,13 +150,14 @@ func (s *Server) handlePodExec(w http.ResponseWriter, r *http.Request) {
 		log.Printf("Exec session %s ended (%s/%s)", sessionID, namespace, podName)
 	}()
 
-	// Get K8s client and config
-	client := k8s.GetClient()
-	config := k8s.GetConfig()
+	// Get K8s client and config (impersonated when auth is enabled)
+	client := s.getClientForRequest(r)
+	config := s.getConfigForRequest(r)
 	if client == nil || config == nil {
 		sendWSError(conn, "K8s client not initialized")
 		return
 	}
+	auth.AuditLog(r, namespace, podName)
 
 	// Build exec request
 	req := client.CoreV1().RESTClient().Post().
@@ -368,13 +370,14 @@ func (s *Server) handleCreateDebugContainer(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	// Create ephemeral container
-	ec, err := k8s.CreateEphemeralContainer(r.Context(), k8s.EphemeralContainerOptions{
+	// Create ephemeral container (impersonated when auth is enabled)
+	auth.AuditLog(r, namespace, podName)
+	ec, err := k8s.CreateEphemeralContainerWithClient(r.Context(), k8s.EphemeralContainerOptions{
 		Namespace:       namespace,
 		PodName:         podName,
 		TargetContainer: req.TargetContainer,
 		Image:           req.Image,
-	})
+	}, s.getClientForRequest(r))
 	if err != nil {
 		errMsg := err.Error()
 		if strings.Contains(errMsg, "not found") {

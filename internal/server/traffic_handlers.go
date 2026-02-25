@@ -43,7 +43,7 @@ func (s *Server) handleGetTrafficFlows(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Parse query parameters
-	namespaces := parseNamespaces(r.URL.Query())
+	namespaces := s.parseNamespacesForUser(r)
 	sinceStr := r.URL.Query().Get("since")
 
 	opts := traffic.DefaultFlowOptions()

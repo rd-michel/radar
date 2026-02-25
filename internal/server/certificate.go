@@ -73,7 +73,7 @@ func (s *Server) handleSecretCertExpiry(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	namespaces := parseNamespaces(r.URL.Query())
+	namespaces := s.parseNamespacesForUser(r)
 	var secrets []*corev1.Secret
 	var listErr error
 	if len(namespaces) == 1 {

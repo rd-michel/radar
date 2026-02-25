@@ -203,7 +203,7 @@ type DashboardHelmRelease struct {
 
 func (s *Server) handleDashboard(w http.ResponseWriter, r *http.Request) {
 	dashStart := time.Now()
-	namespaces := parseNamespaces(r.URL.Query())
+	namespaces := s.parseNamespacesForUser(r)
 	// For backward compat with single namespace string in internal functions
 	namespace := ""
 	if len(namespaces) == 1 {
@@ -296,7 +296,7 @@ func (s *Server) handleDashboardHelm(w http.ResponseWriter, r *http.Request) {
 	if !s.requireConnected(w) {
 		return
 	}
-	namespaces := parseNamespaces(r.URL.Query())
+	namespaces := s.parseNamespacesForUser(r)
 	namespace := ""
 	if len(namespaces) == 1 {
 		namespace = namespaces[0]

@@ -13,6 +13,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/dynamic"
 	"sigs.k8s.io/yaml"
 )
 
@@ -36,12 +37,21 @@ type UpdateResourceOptions struct {
 
 // UpdateResource updates a Kubernetes resource from YAML
 func UpdateResource(ctx context.Context, opts UpdateResourceOptions) (*unstructured.Unstructured, error) {
+	return UpdateResourceWithClient(ctx, opts, nil)
+}
+
+// UpdateResourceWithClient updates a Kubernetes resource using the provided client.
+// If client is nil, uses the shared dynamic client.
+func UpdateResourceWithClient(ctx context.Context, opts UpdateResourceOptions, client dynamic.Interface) (*unstructured.Unstructured, error) {
 	discovery := GetResourceDiscovery()
 	if discovery == nil {
 		return nil, fmt.Errorf("resource discovery not initialized")
 	}
 
-	dynamicClient := GetDynamicClient()
+	dynamicClient := client
+	if dynamicClient == nil {
+		dynamicClient = GetDynamicClient()
+	}
 	if dynamicClient == nil {
 		return nil, fmt.Errorf("dynamic client not initialized")
 	}
@@ -94,12 +104,21 @@ type DeleteResourceOptions struct {
 
 // DeleteResource deletes a Kubernetes resource
 func DeleteResource(ctx context.Context, opts DeleteResourceOptions) error {
+	return DeleteResourceWithClient(ctx, opts, nil)
+}
+
+// DeleteResourceWithClient deletes a Kubernetes resource using the provided client.
+// If client is nil, uses the shared dynamic client.
+func DeleteResourceWithClient(ctx context.Context, opts DeleteResourceOptions, client dynamic.Interface) error {
 	discovery := GetResourceDiscovery()
 	if discovery == nil {
 		return fmt.Errorf("resource discovery not initialized")
 	}
 
-	dynamicClient := GetDynamicClient()
+	dynamicClient := client
+	if dynamicClient == nil {
+		dynamicClient = GetDynamicClient()
+	}
 	if dynamicClient == nil {
 		return fmt.Errorf("dynamic client not initialized")
 	}
@@ -169,7 +188,15 @@ func DeleteResource(ctx context.Context, opts DeleteResourceOptions) error {
 
 // TriggerCronJob creates a Job from a CronJob
 func TriggerCronJob(ctx context.Context, namespace, name string) (*unstructured.Unstructured, error) {
-	dynamicClient := GetDynamicClient()
+	return TriggerCronJobWithClient(ctx, namespace, name, nil)
+}
+
+// TriggerCronJobWithClient creates a Job from a CronJob using the provided client.
+func TriggerCronJobWithClient(ctx context.Context, namespace, name string, client dynamic.Interface) (*unstructured.Unstructured, error) {
+	dynamicClient := client
+	if dynamicClient == nil {
+		dynamicClient = GetDynamicClient()
+	}
 	if dynamicClient == nil {
 		return nil, fmt.Errorf("dynamic client not initialized")
 	}
@@ -255,7 +282,15 @@ func TriggerCronJob(ctx context.Context, namespace, name string) (*unstructured.
 
 // SetCronJobSuspend sets the suspend field on a CronJob
 func SetCronJobSuspend(ctx context.Context, namespace, name string, suspend bool) error {
-	dynamicClient := GetDynamicClient()
+	return SetCronJobSuspendWithClient(ctx, namespace, name, suspend, nil)
+}
+
+// SetCronJobSuspendWithClient sets the suspend field on a CronJob using the provided client.
+func SetCronJobSuspendWithClient(ctx context.Context, namespace, name string, suspend bool, client dynamic.Interface) error {
+	dynamicClient := client
+	if dynamicClient == nil {
+		dynamicClient = GetDynamicClient()
+	}
 	if dynamicClient == nil {
 		return fmt.Errorf("dynamic client not initialized")
 	}
@@ -289,7 +324,15 @@ func SetCronJobSuspend(ctx context.Context, namespace, name string, suspend bool
 
 // RestartWorkload performs a rolling restart on a Deployment, StatefulSet, or DaemonSet
 func RestartWorkload(ctx context.Context, kind, namespace, name string) error {
-	dynamicClient := GetDynamicClient()
+	return RestartWorkloadWithClient(ctx, kind, namespace, name, nil)
+}
+
+// RestartWorkloadWithClient performs a rolling restart using the provided client.
+func RestartWorkloadWithClient(ctx context.Context, kind, namespace, name string, client dynamic.Interface) error {
+	dynamicClient := client
+	if dynamicClient == nil {
+		dynamicClient = GetDynamicClient()
+	}
 	if dynamicClient == nil {
 		return fmt.Errorf("dynamic client not initialized")
 	}
@@ -325,7 +368,15 @@ func RestartWorkload(ctx context.Context, kind, namespace, name string) error {
 
 // ScaleWorkload scales a Deployment or StatefulSet to the specified replica count
 func ScaleWorkload(ctx context.Context, kind, namespace, name string, replicas int32) error {
-	dynamicClient := GetDynamicClient()
+	return ScaleWorkloadWithClient(ctx, kind, namespace, name, replicas, nil)
+}
+
+// ScaleWorkloadWithClient scales a workload using the provided client.
+func ScaleWorkloadWithClient(ctx context.Context, kind, namespace, name string, replicas int32, client dynamic.Interface) error {
+	dynamicClient := client
+	if dynamicClient == nil {
+		dynamicClient = GetDynamicClient()
+	}
 	if dynamicClient == nil {
 		return fmt.Errorf("dynamic client not initialized")
 	}
@@ -609,7 +660,15 @@ func extractContainerImageFromData(obj map[string]any) string {
 
 // RollbackWorkload rolls back a Deployment, StatefulSet, or DaemonSet to a specific revision.
 func RollbackWorkload(ctx context.Context, kind, namespace, name string, revision int64) error {
-	dynamicClient := GetDynamicClient()
+	return RollbackWorkloadWithClient(ctx, kind, namespace, name, revision, nil)
+}
+
+// RollbackWorkloadWithClient rolls back a workload using the provided client.
+func RollbackWorkloadWithClient(ctx context.Context, kind, namespace, name string, revision int64, client dynamic.Interface) error {
+	dynamicClient := client
+	if dynamicClient == nil {
+		dynamicClient = GetDynamicClient()
+	}
 	if dynamicClient == nil {
 		return fmt.Errorf("dynamic client not initialized")
 	}
@@ -635,17 +694,16 @@ func RollbackWorkload(ctx context.Context, kind, namespace, name string, revisio
 
 	switch normalizedKind {
 	case "deployments":
-		return rollbackDeployment(ctx, discovery, namespace, name, workloadUID, revision)
+		return rollbackDeployment(ctx, discovery, dynamicClient, namespace, name, workloadUID, revision)
 	case "statefulsets", "daemonsets":
-		return rollbackControllerRevision(ctx, discovery, normalizedKind, namespace, name, workloadUID, revision)
+		return rollbackControllerRevision(ctx, discovery, dynamicClient, normalizedKind, namespace, name, workloadUID, revision)
 	default:
 		return fmt.Errorf("rollback not supported for %s", kind)
 	}
 }
 
 // rollbackDeployment rolls back a Deployment by copying the target ReplicaSet's pod template.
-func rollbackDeployment(ctx context.Context, discovery *ResourceDiscovery, namespace, name, workloadUID string, revision int64) error {
-	dynamicClient := GetDynamicClient()
+func rollbackDeployment(ctx context.Context, discovery *ResourceDiscovery, dynamicClient dynamic.Interface, namespace, name, workloadUID string, revision int64) error {
 
 	rsGVR, ok := discovery.GetGVR("replicasets")
 	if !ok {
@@ -729,8 +787,7 @@ func rollbackDeployment(ctx context.Context, discovery *ResourceDiscovery, names
 }
 
 // rollbackControllerRevision rolls back a StatefulSet or DaemonSet using a ControllerRevision's data.
-func rollbackControllerRevision(ctx context.Context, discovery *ResourceDiscovery, normalizedKind, namespace, name, workloadUID string, revision int64) error {
-	dynamicClient := GetDynamicClient()
+func rollbackControllerRevision(ctx context.Context, discovery *ResourceDiscovery, dynamicClient dynamic.Interface, normalizedKind, namespace, name, workloadUID string, revision int64) error {
 
 	crGVR, ok := discovery.GetGVR("controllerrevisions")
 	if !ok {

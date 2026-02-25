@@ -21,6 +21,7 @@ import { ContextSwitchProvider, useContextSwitch } from './context/ContextSwitch
 import { ConnectionProvider, useConnection } from './context/ConnectionContext'
 import { ConnectionErrorView } from './components/ConnectionErrorView'
 import { CapabilitiesProvider } from './contexts/CapabilitiesContext'
+import { UserMenu } from './components/UserMenu'
 import { ErrorBoundary } from './components/ui/ErrorBoundary'
 import { NamespaceSelector } from './components/ui/NamespaceSelector'
 import { UpdateNotification } from './components/ui/UpdateNotification'
@@ -554,6 +555,9 @@ function AppInner() {
               <span className="hidden md:inline">Discovering CRDs...</span>
             </div>
           )}
+          {/* User info + logout (when auth enabled) */}
+          <UserMenu />
+
           {/* Namespace selector with search */}
           <NamespaceSelector
             value={namespaces}
