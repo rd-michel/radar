@@ -1187,7 +1187,6 @@ function getInitialFiltersFromURL() {
     ownerKind: params.get('ownerKind') || '', // e.g., "DaemonSet"
     ownerName: params.get('ownerName') || '', // e.g., "app-caretta"
   }
-  console.debug('[filters] getInitialFiltersFromURL:', { url: window.location.search, columnFilters: result.columnFilters, search: result.search, problemFilters: result.problemFilters })
   return result
 }
 
@@ -1224,8 +1223,6 @@ export function ResourcesView({ namespaces, selectedResource, onResourceClick, o
   // Pinned kinds (favorites)
   const { pinned, togglePin, isPinned } = usePinnedKinds()
   const [favoritesExpanded, setFavoritesExpanded] = useState(() => pinned.length > 0)
-
-  console.debug('[filters] ResourcesView render:', { kind: selectedKind.name, columnFilters, searchTerm, url: location.search })
 
   // Track if this is the initial mount to avoid re-syncing on first render
   const isInitialMount = useRef(true)
@@ -1676,11 +1673,8 @@ export function ResourcesView({ namespaces, selectedResource, onResourceClick, o
   useEffect(() => {
     if (isInitialMount.current) {
       isInitialMount.current = false
-      console.debug('[filters] URL sync effect: skipping initial mount')
       return
     }
-
-    console.debug('[filters] URL sync effect: location.search changed →', location.search)
 
     // Mark that we're syncing from URL to prevent URL write-back
     isSyncingFromURL.current = true
@@ -1691,7 +1685,6 @@ export function ResourcesView({ namespaces, selectedResource, onResourceClick, o
 
     // Update kind if it changed
     if (newKind.name !== selectedKind.name || newKind.group !== selectedKind.group) {
-      console.debug('[filters] URL sync: kind changed', { from: selectedKind.name, to: newKind.name })
       setSelectedKind(newKind)
     }
 
@@ -1710,15 +1703,11 @@ export function ResourcesView({ namespaces, selectedResource, onResourceClick, o
     const newFiltersStr = serializeColumnFilters(newFilters.columnFilters)
     const currentFiltersStr = serializeColumnFilters(columnFilters)
     if (newFiltersStr !== currentFiltersStr) {
-      console.debug('[filters] URL sync: columnFilters changed', { from: columnFilters, to: newFilters.columnFilters })
       setColumnFilters(newFilters.columnFilters)
-    } else {
-      console.debug('[filters] URL sync: columnFilters unchanged', columnFilters)
     }
 
     // Reset the flag after a tick to allow normal URL updates
     requestAnimationFrame(() => {
-      console.debug('[filters] URL sync: resetting isSyncingFromURL flag')
       isSyncingFromURL.current = false
     })
   }, [location.search, location.pathname]) // Re-run when URL path or search params change
@@ -1777,7 +1766,7 @@ export function ResourcesView({ namespaces, selectedResource, onResourceClick, o
     const newPath = `/resources/${kindInfo.name}`
     const queryStr = params.toString()
     const newURL = queryStr ? `${newPath}?${queryStr}` : newPath
-    console.debug('[filters] updateURL:', newURL, pushHistory ? '(push)' : '(replace)')
+
     if (pushHistory) {
       navigate({ pathname: newPath, search: queryStr }, { replace: false })
     } else {
@@ -1789,26 +1778,26 @@ export function ResourcesView({ namespaces, selectedResource, onResourceClick, o
   useEffect(() => {
     // Skip URL update if we're syncing FROM the URL (e.g., browser back button)
     if (isSyncingFromURL.current) {
-      console.debug('[filters] URL update effect: skipped (syncing from URL)')
+
       return
     }
     // Skip on initial mount so we don't strip ?resource= before the mount effect reads it
     if (!hasProcessedInitialResource.current) {
-      console.debug('[filters] URL update effect: skipped (waiting for initial resource processing)')
+
       return
     }
     // Skip URL update if selectedResource's kind doesn't match selectedKind (still syncing)
     if (selectedResource) {
       const resourceKindLower = selectedResource.kind.toLowerCase()
       if (selectedKind.name.toLowerCase() !== resourceKindLower) {
-        console.debug('[filters] URL update effect: skipped (kind mismatch)', { selectedKind: selectedKind.name, resourceKind: selectedResource.kind })
+
         return // Wait for kind sync effect to run first
       }
     }
     // Push history when kind changes (so browser back/forward works), replace for filter changes
     const pushHistory = shouldPushHistory.current
     shouldPushHistory.current = false
-    console.debug('[filters] URL update effect: writing state to URL', { kind: selectedKind.name, columnFilters, searchTerm, problemFilters, pushHistory })
+
     updateURL(selectedKind, searchTerm, columnFilters, problemFilters, showInactiveReplicaSets, selectedResource?.namespace, selectedResource?.name, pushHistory)
   }, [selectedKind, searchTerm, columnFilters, problemFilters, showInactiveReplicaSets, selectedResource, updateURL])
 
@@ -2012,18 +2001,13 @@ export function ResourcesView({ namespaces, selectedResource, onResourceClick, o
   const prevKindRef = useRef(selectedKind.name)
   useEffect(() => {
     if (prevKindRef.current === selectedKind.name) {
-      console.debug('[filters] kind-change effect: skipping (kind unchanged on mount)', selectedKind.name)
       return
     }
-    console.debug('[filters] kind-change effect: kind changed from', prevKindRef.current, 'to', selectedKind.name, '| isSyncingFromURL =', isSyncingFromURL.current)
     prevKindRef.current = selectedKind.name
     setSortColumn(null)
     setSortDirection(null)
     if (!isSyncingFromURL.current) {
-      console.debug('[filters] kind-change effect: clearing columnFilters')
       setColumnFilters({})
-    } else {
-      console.debug('[filters] kind-change effect: preserving columnFilters (URL sync in progress)')
     }
     setProblemFilters([])
   }, [selectedKind.name])
@@ -2181,13 +2165,11 @@ export function ResourcesView({ namespaces, selectedResource, onResourceClick, o
     const activeColFilters = Object.entries(columnFilters).filter(([, v]) => v)
     if (activeColFilters.length > 0) {
       const kindLower = normalizeKindToPlural(selectedKind.name)
-      const beforeCount = result.length
       result = result.filter((r: any) =>
         activeColFilters.every(([col, val]) =>
           getCellFilterValue(r, col, kindLower) === val
         )
       )
-      console.debug('[filters] filteredResources: column filters applied', { filters: Object.fromEntries(activeColFilters), kind: kindLower, before: beforeCount, after: result.length })
     }
 
     // Apply problem filters (pods only)
@@ -2591,7 +2573,7 @@ export function ResourcesView({ namespaces, selectedResource, onResourceClick, o
       .sort((a, b) => b.count - a.count)
       .slice(0, 30) // cap at 30 most common labels
 
-    console.debug('[filters] filterOptions:', { kind: kindLower, columns: filterableColumns.map(c => `${c.label}(${c.values.length} vals)`), hasProblems: !!problems, labels: labelValues.length })
+
     if (filterableColumns.length === 0 && !problems && labelValues.length === 0) return null
     return { columns: filterableColumns, problems, labels: labelValues }
   }, [resources, selectedKind.name])
@@ -2662,7 +2644,7 @@ export function ResourcesView({ namespaces, selectedResource, onResourceClick, o
   return (
     <div className="flex h-full w-full">
       {/* Sidebar - Resource Types */}
-      <div className="w-72 bg-theme-surface border-r border-theme-border overflow-y-auto shrink-0">
+      <div className="w-72 bg-theme-surface border-r border-theme-border overflow-y-auto overflow-x-hidden shrink-0">
         <div className="flex items-center gap-2 px-3 py-3 border-b border-theme-border">
           <h2 className="text-sm font-medium text-theme-text-secondary uppercase tracking-wide shrink-0">
             Resources
@@ -3261,7 +3243,7 @@ const ResourceTypeButton = forwardRef<HTMLButtonElement, ResourceTypeButtonProps
         ref={ref}
         onClick={onClick}
         className={clsx(
-          'w-full flex items-center gap-3 px-3 py-1.5 rounded-lg text-sm transition-colors group/kind',
+          'w-full flex items-center gap-3 px-3 py-1.5 rounded-lg text-sm transition-colors group/kind min-w-0',
           isSelected
             ? 'bg-blue-500/20 text-blue-700 dark:text-blue-300'
             : forbidden
@@ -3270,8 +3252,8 @@ const ResourceTypeButton = forwardRef<HTMLButtonElement, ResourceTypeButtonProps
         )}
       >
         <Icon className="w-4 h-4 shrink-0" />
-        <Tooltip content={forbidden ? `${resource.kind} (no access)` : resource.kind} position="right">
-          <span className="flex-1 text-left truncate">
+        <Tooltip content={forbidden ? `${resource.kind} (no access)` : resource.kind} position="right" wrapperClassName="min-w-0 flex-1 overflow-hidden">
+          <span className="text-left truncate block">
             {resource.kind}
           </span>
         </Tooltip>
