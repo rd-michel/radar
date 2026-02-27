@@ -146,7 +146,7 @@ func (c *Client) discover(ctx context.Context) (string, string, error) {
 
 	// Not reachable in-cluster — try port-forward
 	log.Printf("[prometheus] Service %s/%s not reachable in-cluster, starting port-forward...", info.namespace, info.name)
-	connInfo, err := portforward.Start(ctx, info.namespace, info.name, info.port, contextName)
+	connInfo, err := portforward.Start(ctx, info.namespace, info.name, info.targetPort, contextName)
 	if err != nil {
 		return "", "", fmt.Errorf("port-forward to %s/%s failed: %w", info.namespace, info.name, err)
 	}
@@ -177,7 +177,8 @@ func (c *Client) discover(ctx context.Context) (string, string, error) {
 type serviceInfo struct {
 	namespace   string
 	name        string
-	port        int
+	port        int // service port (for cluster-internal address)
+	targetPort  int // container port (for port-forwarding to pod)
 	clusterAddr string
 	basePath    string
 }
@@ -198,12 +199,14 @@ func (c *Client) findWellKnownService(ctx context.Context) *serviceInfo {
 
 		port := resolvePort(*svc, loc.port)
 		addr := buildClusterAddr(svc.Name, svc.Namespace, svc.Spec.ClusterIP, port)
+		tp := resolveTargetPort(*svc, port)
 
-		log.Printf("[prometheus] Found well-known service: %s/%s:%d", svc.Namespace, svc.Name, port)
+		log.Printf("[prometheus] Found well-known service: %s/%s:%d (targetPort=%d)", svc.Namespace, svc.Name, port, tp)
 		return &serviceInfo{
 			namespace:   svc.Namespace,
 			name:        svc.Name,
 			port:        port,
+			targetPort:  tp,
 			clusterAddr: addr,
 			basePath:    loc.basePath,
 		}
@@ -241,6 +244,7 @@ func (c *Client) discoverDynamic(ctx context.Context) *serviceInfo {
 				namespace:   svc.Namespace,
 				name:        svc.Name,
 				port:        port,
+				targetPort:  resolveTargetPort(svc, port),
 				clusterAddr: buildClusterAddr(svc.Name, svc.Namespace, svc.Spec.ClusterIP, port),
 				basePath:    bp,
 			},
@@ -373,6 +377,22 @@ func resolvePort(svc corev1.Service, defaultPort int) int {
 		return int(svc.Spec.Ports[0].Port)
 	}
 	return 80
+}
+
+// resolveTargetPort returns the container port for port-forwarding.
+// When the service port differs from the container's targetPort (e.g., service:80 → container:9090),
+// port-forwarding needs the container port since it bypasses the Service and connects directly to the pod.
+func resolveTargetPort(svc corev1.Service, servicePort int) int {
+	for _, p := range svc.Spec.Ports {
+		if int(p.Port) == servicePort {
+			if p.TargetPort.IntVal > 0 {
+				return int(p.TargetPort.IntVal)
+			}
+			// targetPort unset or zero defaults to the service port
+			return servicePort
+		}
+	}
+	return servicePort
 }
 
 func buildClusterAddr(name, namespace, clusterIP string, port int) string {

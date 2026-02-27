@@ -565,8 +565,8 @@ func (c *CarettaSource) Connect(ctx context.Context, contextName string) (*portf
 	}
 
 	// Start a new managed port-forward
-	log.Printf("[caretta] Starting port-forward to %s/%s:%d", metricsInfo.namespace, metricsInfo.name, metricsInfo.port)
-	connInfo, err := portforward.Start(ctx, metricsInfo.namespace, metricsInfo.name, metricsInfo.port, contextName)
+	log.Printf("[caretta] Starting port-forward to %s/%s:%d (targetPort=%d)", metricsInfo.namespace, metricsInfo.name, metricsInfo.port, metricsInfo.targetPort)
+	connInfo, err := portforward.Start(ctx, metricsInfo.namespace, metricsInfo.name, metricsInfo.targetPort, contextName)
 	if err != nil {
 		return &portforward.ConnectionInfo{
 			Connected:   false,
@@ -587,7 +587,8 @@ func (c *CarettaSource) Connect(ctx context.Context, contextName string) (*portf
 type metricsServiceInfo struct {
 	namespace   string
 	name        string
-	port        int
+	port        int // service port (for cluster-internal address)
+	targetPort  int // container port (for port-forwarding to pod)
 	clusterAddr string
 	basePath    string // sub-path for Prometheus API (e.g. "/select/0/prometheus" for vmselect)
 }
@@ -603,6 +604,21 @@ func resolveServicePort(svc corev1.Service, defaultPort int) int {
 	return 80
 }
 
+// resolveTargetPort returns the container port for port-forwarding.
+// When the service port differs from the container's targetPort (e.g., service:80 → container:9090),
+// port-forwarding needs the container port since it bypasses the Service and connects directly to the pod.
+func resolveTargetPort(svc corev1.Service, servicePort int) int {
+	for _, p := range svc.Spec.Ports {
+		if int(p.Port) == servicePort {
+			if p.TargetPort.IntVal > 0 {
+				return int(p.TargetPort.IntVal)
+			}
+			return servicePort
+		}
+	}
+	return servicePort
+}
+
 // findMetricsServiceLocked finds a metrics service from well-known locations (caller must hold lock)
 func (c *CarettaSource) findMetricsServiceLocked(ctx context.Context) *metricsServiceInfo {
 	for _, loc := range metricsServiceLocations {
@@ -613,12 +629,14 @@ func (c *CarettaSource) findMetricsServiceLocked(ctx context.Context) *metricsSe
 
 		port := resolveServicePort(*svc, loc.port)
 		clusterAddr := buildClusterAddr(svc.Name, svc.Namespace, svc.Spec.ClusterIP, port)
+		tp := resolveTargetPort(*svc, port)
 
-		log.Printf("[caretta] Found metrics service: %s/%s:%d", svc.Namespace, svc.Name, port)
+		log.Printf("[caretta] Found metrics service: %s/%s:%d (targetPort=%d)", svc.Namespace, svc.Name, port, tp)
 		return &metricsServiceInfo{
 			namespace:   svc.Namespace,
 			name:        svc.Name,
 			port:        port,
+			targetPort:  tp,
 			clusterAddr: clusterAddr,
 			basePath:    loc.basePath,
 		}
@@ -764,6 +782,7 @@ func (c *CarettaSource) discoverMetricsServiceDynamic(ctx context.Context) *metr
 				namespace:   svc.Namespace,
 				name:        svc.Name,
 				port:        port,
+				targetPort:  resolveTargetPort(svc, port),
 				clusterAddr: buildClusterAddr(svc.Name, svc.Namespace, svc.Spec.ClusterIP, port),
 				basePath:    bp,
 			},
