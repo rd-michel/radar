@@ -84,19 +84,15 @@ func (s *Server) handlePodFileList(w http.ResponseWriter, r *http.Request) {
 	})
 
 	if err != nil {
-		errMsg := err.Error() + " " + stderr.String()
-		if isCommandNotFound(errMsg) {
-			// find not available — try ls fallback
-			nodes, totalFiles, lsErr := s.listFilesWithLS(r, namespace, podName, container, dirPath)
-			if lsErr != nil {
-				s.writeError(w, http.StatusInternalServerError, "Container lacks 'find' and 'ls' commands. This container may be distroless or minimal.")
-				return
-			}
-			s.writeJSON(w, PodFilesystem{Root: buildRootNode(dirPath, nodes), TotalFiles: totalFiles})
+		// find failed — could be missing command, unsupported flags (e.g. -printf on BusyBox), etc.
+		// Always fall back to ls which is more universally available.
+		log.Printf("[copy] find failed for %s/%s (falling back to ls): %v, stderr: %s", namespace, podName, err, stderr.String())
+		nodes, totalFiles, lsErr := s.listFilesWithLS(r, namespace, podName, container, dirPath)
+		if lsErr != nil {
+			s.writeError(w, http.StatusInternalServerError, "Container lacks 'find' and 'ls' commands. This container may be distroless or minimal.")
 			return
 		}
-		log.Printf("[copy] exec find failed for %s/%s: %v, stderr: %s", namespace, podName, err, stderr.String())
-		s.writeError(w, http.StatusInternalServerError, fmt.Sprintf("Failed to list files: %v", err))
+		s.writeJSON(w, PodFilesystem{Root: buildRootNode(dirPath, nodes), TotalFiles: totalFiles})
 		return
 	}
 
