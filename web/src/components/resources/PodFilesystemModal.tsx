@@ -3,6 +3,8 @@ import { createPortal } from 'react-dom'
 import { X, File, Link2, ChevronRight, AlertTriangle, Loader2, Search, Download, FolderOpen } from 'lucide-react'
 import { clsx } from 'clsx'
 import type { FileNode } from '../../types'
+import { formatBytes } from '../../utils/format'
+import { downloadBlob, filterTree } from './file-browser-utils'
 
 const API_BASE = '/api'
 
@@ -27,15 +29,6 @@ async function fetchPodFiles(
     throw new Error(error.error || `HTTP ${response.status}`)
   }
   return response.json()
-}
-
-function downloadBlob(blob: Blob, filename: string) {
-  const url = URL.createObjectURL(blob)
-  const a = document.createElement('a')
-  a.href = url
-  a.download = filename
-  a.click()
-  URL.revokeObjectURL(url)
 }
 
 interface PodFilesystemModalProps {
@@ -407,32 +400,3 @@ function PodFileTreeNode({ node, namespace, podName, container, onNavigate }: Po
   )
 }
 
-// ============================================================================
-// Utility Functions
-// ============================================================================
-
-function formatBytes(bytes: number): string {
-  if (bytes === 0) return '0 B'
-  const k = 1024
-  const sizes = ['B', 'KB', 'MB', 'GB', 'TB']
-  const i = Math.floor(Math.log(bytes) / Math.log(k))
-  return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i]
-}
-
-function filterTree(node: FileNode, query: string): FileNode | null {
-  if (node.name.toLowerCase().includes(query)) {
-    return node
-  }
-
-  if (node.type === 'dir' && node.children) {
-    const filteredChildren = node.children
-      .map((child) => filterTree(child, query))
-      .filter((child): child is FileNode => child !== null)
-
-    if (filteredChildren.length > 0) {
-      return { ...node, children: filteredChildren }
-    }
-  }
-
-  return null
-}

@@ -4,6 +4,8 @@ import { X, Folder, File, Link2, ChevronRight, ChevronDown, AlertTriangle, Loade
 import { clsx } from 'clsx'
 import { useImageMetadata, ApiError } from '../../api/client'
 import type { FileNode, ImageFilesystem } from '../../types'
+import { formatBytes } from '../../utils/format'
+import { downloadBlob, filterTree } from './file-browser-utils'
 
 const API_BASE = '/api'
 
@@ -637,14 +639,7 @@ function FileTreeNode({ node, depth, defaultExpanded = true, image, namespace, p
       }
 
       const blob = await response.blob()
-      const url = window.URL.createObjectURL(blob)
-      const a = document.createElement('a')
-      a.href = url
-      a.download = node.name
-      document.body.appendChild(a)
-      a.click()
-      window.URL.revokeObjectURL(url)
-      document.body.removeChild(a)
+      downloadBlob(blob, node.name)
     } catch (err) {
       console.error('Download failed:', err)
     } finally {
@@ -743,34 +738,3 @@ function FileTreeNode({ node, depth, defaultExpanded = true, image, namespace, p
   )
 }
 
-// ============================================================================
-// Utility Functions
-// ============================================================================
-
-function formatBytes(bytes: number): string {
-  if (bytes === 0) return '0 B'
-  const k = 1024
-  const sizes = ['B', 'KB', 'MB', 'GB', 'TB']
-  const i = Math.floor(Math.log(bytes) / Math.log(k))
-  return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i]
-}
-
-function filterTree(node: FileNode, query: string): FileNode | null {
-  // If this node matches, return it with all children
-  if (node.name.toLowerCase().includes(query)) {
-    return node
-  }
-
-  // If it's a directory, filter children recursively
-  if (node.type === 'dir' && node.children) {
-    const filteredChildren = node.children
-      .map((child) => filterTree(child, query))
-      .filter((child): child is FileNode => child !== null)
-
-    if (filteredChildren.length > 0) {
-      return { ...node, children: filteredChildren }
-    }
-  }
-
-  return null
-}
