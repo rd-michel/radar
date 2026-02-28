@@ -17,7 +17,7 @@ import {
   EyeOff,
   ArrowUpDown,
   Clock,
-  Filter,
+  ListFilter,
   X,
   Columns3,
   RotateCcw,
@@ -151,11 +151,11 @@ const SKIP_FILTER_COLUMNS = new Set([
   'capacity', 'accessModes', 'volume', 'step', 'progress', 'template', 'expires',
   'issuer', 'domain', 'presented', 'listeners', 'routes', 'addresses', 'hostnames',
   'parents', 'backends', 'controller', 'description', 'externalIP', 'address',
-  'conditions', 'taints', 'version', 'desired', 'upToDate', 'available', 'owner',
+  'conditions', 'taints', 'desired', 'upToDate', 'available', 'owner',
   'tls', 'endpoints', 'object', 'count', 'lastSeen', 'reason', 'source', 'inventory',
-  'lastUpdated', 'chart', 'provider', 'events', 'project', 'sync', 'health', 'repo',
+  'lastUpdated', 'chart', 'events', 'repo',
   'generators', 'applications', 'destinations', 'sources', 'budget', 'healthy', 'allowed',
-  'secrets', 'subjects', 'role', 'node', 'entrypoint', 'templates',
+  'secrets', 'subjects', 'role', 'entrypoint', 'templates',
 ])
 
 // Fallback resource types when API resources aren't loaded yet
@@ -1205,9 +1205,16 @@ export function ResourcesView({ namespaces, selectedResource, onResourceClick, o
   const [sortDirection, setSortDirection] = useState<SortDirection>(null)
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null)
   // Filter state
-  const [columnFilters, setColumnFilters] = useState<Record<string, string>>(initialFilters.columnFilters)
+  const [columnFilters, setColumnFilters] = useState<Record<string, string[]>>(initialFilters.columnFilters)
   const [problemFilters, setProblemFilters] = useState<string[]>(initialFilters.problemFilters)
-  const [showFilterDropdown, setShowFilterDropdown] = useState(false)
+  const [openColumnFilter, setOpenColumnFilter] = useState<string | null>(null)
+  const [columnFilterSearch, setColumnFilterSearch] = useState('')
+  const columnFilterDropdownRef = useRef<HTMLDivElement>(null)
+  const [showProblemsDropdown, setShowProblemsDropdown] = useState(false)
+  const problemsDropdownRef = useRef<HTMLDivElement>(null)
+  const [showLabelsDropdown, setShowLabelsDropdown] = useState(false)
+  const [labelSearch, setLabelSearch] = useState('')
+  const labelsDropdownRef = useRef<HTMLDivElement>(null)
   // ReplicaSet-specific: hide inactive by default
   const [showInactiveReplicaSets, setShowInactiveReplicaSets] = useState(initialFilters.showInactive)
   // Column visibility and resize state
@@ -1219,6 +1226,34 @@ export function ResourcesView({ namespaces, selectedResource, onResourceClick, o
   const [labelSelector, setLabelSelector] = useState<string>(initialFilters.labelSelector)
   const [ownerKind, setOwnerKind] = useState<string>(initialFilters.ownerKind)
   const [ownerName, setOwnerName] = useState<string>(initialFilters.ownerName)
+
+  // Column filter helpers
+  const clearColumnFilter = useCallback((key: string) => {
+    setColumnFilters(prev => {
+      const next = { ...prev }
+      delete next[key]
+      return next
+    })
+  }, [])
+
+  const toggleColumnFilterValue = useCallback((key: string, value: string) => {
+    setColumnFilters(prev => {
+      const next = { ...prev }
+      const current = next[key] || []
+      const idx = current.indexOf(value)
+      if (idx >= 0) {
+        const updated = current.filter(v => v !== value)
+        if (updated.length === 0) {
+          delete next[key]
+        } else {
+          next[key] = updated
+        }
+      } else {
+        next[key] = [...current, value]
+      }
+      return next
+    })
+  }, [])
 
   // Pinned kinds (favorites)
   const { pinned, togglePin, isPinned } = usePinnedKinds()
@@ -1240,8 +1275,6 @@ export function ResourcesView({ namespaces, selectedResource, onResourceClick, o
   const lastScrolledResource = useRef<string | null>(null)
   // Ref to search input for keyboard shortcut
   const searchInputRef = useRef<HTMLInputElement>(null)
-  // Ref to filter dropdown for click-outside closing
-  const filterDropdownRef = useRef<HTMLDivElement>(null)
   // Resize state
   const resizingColumn = useRef<string | null>(null)
   const resizeStartX = useRef(0)
@@ -1603,7 +1636,9 @@ export function ResourcesView({ namespaces, selectedResource, onResourceClick, o
       handler: () => {
         // Close dropdowns first, then clear highlight, then blur search
         if (showColumnPicker) { setShowColumnPicker(false); return }
-        if (showFilterDropdown) { setShowFilterDropdown(false); return }
+        if (openColumnFilter) { setOpenColumnFilter(null); return }
+        if (showProblemsDropdown) { setShowProblemsDropdown(false); return }
+        if (showLabelsDropdown) { setShowLabelsDropdown(false); return }
         if (highlightedIndex >= 0) setHighlightedIndex(-1)
         else searchInputRef.current?.blur()
       },
@@ -1653,21 +1688,25 @@ export function ResourcesView({ namespaces, selectedResource, onResourceClick, o
     },
   ])
 
-  // Close filter dropdown on outside click or Escape
+  // Close dropdowns on outside click
   useEffect(() => {
-    if (!showFilterDropdown) return
+    const anyOpen = showProblemsDropdown || showLabelsDropdown || openColumnFilter
+    if (!anyOpen) return
     const handleClick = (e: MouseEvent) => {
-      if (filterDropdownRef.current && !filterDropdownRef.current.contains(e.target as Node)) {
-        setShowFilterDropdown(false)
+      const target = e.target as HTMLElement
+      if (showProblemsDropdown && problemsDropdownRef.current && !problemsDropdownRef.current.contains(target)) {
+        setShowProblemsDropdown(false)
+      }
+      if (showLabelsDropdown && labelsDropdownRef.current && !labelsDropdownRef.current.contains(target)) {
+        setShowLabelsDropdown(false)
+      }
+      if (openColumnFilter && !target.closest('[data-column-filter-trigger]') && columnFilterDropdownRef.current && !columnFilterDropdownRef.current.contains(target)) {
+        setOpenColumnFilter(null)
       }
     }
-    const handleKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') { e.stopPropagation(); setShowFilterDropdown(false) }
-    }
     document.addEventListener('mousedown', handleClick)
-    document.addEventListener('keydown', handleKey, true)
-    return () => { document.removeEventListener('mousedown', handleClick); document.removeEventListener('keydown', handleKey, true) }
-  }, [showFilterDropdown])
+    return () => document.removeEventListener('mousedown', handleClick)
+  }, [showProblemsDropdown, showLabelsDropdown, openColumnFilter])
 
   // Sync state from URL when navigation occurs (e.g., deep linking from WorkloadRenderer)
   useEffect(() => {
@@ -1718,7 +1757,7 @@ export function ResourcesView({ namespaces, selectedResource, onResourceClick, o
   const updateURL = useCallback((
     kindInfo: SelectedKindInfo,
     search: string,
-    colFilters: Record<string, string>,
+    colFilters: Record<string, string[]>,
     problems: string[],
     showInactive: boolean,
     resourceNs?: string,
@@ -2006,6 +2045,7 @@ export function ResourcesView({ namespaces, selectedResource, onResourceClick, o
     prevKindRef.current = selectedKind.name
     setSortColumn(null)
     setSortDirection(null)
+    setOpenColumnFilter(null)
     if (!isSyncingFromURL.current) {
       setColumnFilters({})
     }
@@ -2161,13 +2201,13 @@ export function ResourcesView({ namespaces, selectedResource, onResourceClick, o
       )
     }
 
-    // Apply column filters (generic)
-    const activeColFilters = Object.entries(columnFilters).filter(([, v]) => v)
+    // Apply column filters (generic, multi-select per column — OR within column, AND across columns)
+    const activeColFilters = Object.entries(columnFilters).filter(([, vals]) => vals.length > 0)
     if (activeColFilters.length > 0) {
       const kindLower = normalizeKindToPlural(selectedKind.name)
       result = result.filter((r: any) =>
-        activeColFilters.every(([col, val]) =>
-          getCellFilterValue(r, col, kindLower) === val
+        activeColFilters.every(([col, vals]) =>
+          vals.includes(getCellFilterValue(r, col, kindLower))
         )
       )
     }
@@ -2519,7 +2559,9 @@ export function ResourcesView({ namespaces, selectedResource, onResourceClick, o
 
       const distinctCount = Object.keys(valueCounts).length
       // Only include if 2-20 distinct values (too few = useless, too many = not a filter)
-      if (distinctCount >= 2 && distinctCount <= 20) {
+      // Node column gets a higher cap (50) since clusters commonly have 20-50 nodes
+      const maxDistinct = col.key === 'node' ? 50 : 20
+      if (distinctCount >= 2 && distinctCount <= maxDistinct) {
         filterableColumns.push({
           key: col.key,
           label: col.label,
@@ -2578,6 +2620,15 @@ export function ResourcesView({ namespaces, selectedResource, onResourceClick, o
     return { columns: filterableColumns, problems, labels: labelValues }
   }, [resources, selectedKind.name])
 
+  // Map filterable columns by key for O(1) lookup in header rendering
+  const filterableColumnMap = useMemo(() => {
+    const map = new Map<string, { key: string; label: string; values: Array<{ value: string; count: number }> }>()
+    if (filterOptions) {
+      for (const col of filterOptions.columns) map.set(col.key, col)
+    }
+    return map
+  }, [filterOptions])
+
   // Compute inactive ReplicaSet count for toggle display
   const inactiveReplicaSetCount = useMemo(() => {
     if (selectedKind.name.toLowerCase() !== 'replicasets' || !resources) return 0
@@ -2585,26 +2636,8 @@ export function ResourcesView({ namespaces, selectedResource, onResourceClick, o
   }, [resources, selectedKind.name])
 
   // Check if any filters are active
-  const hasActiveColumnFilters = Object.values(columnFilters).some(v => v)
-  const hasActiveFilters = hasActiveColumnFilters || problemFilters.length > 0 || labelSelector !== '' || (ownerKind !== '' && ownerName !== '')
   const hasOwnerFilter = ownerKind !== '' && ownerName !== ''
 
-  // Clear all filters
-  const clearFilters = useCallback(() => {
-    setColumnFilters({})
-    setProblemFilters([])
-    setLabelSelector('')
-    setOwnerKind('')
-    setOwnerName('')
-    // Also clear URL params
-    const params = new URLSearchParams(window.location.search)
-    params.delete('filters')
-    params.delete('labels')
-    params.delete('ownerKind')
-    params.delete('ownerName')
-    window.history.replaceState({}, '', `${window.location.pathname}?${params.toString()}`)
-    setShowFilterDropdown(false)
-  }, [])
 
   // Toggle problem filter
   const toggleProblemFilter = useCallback((problem: string) => {
@@ -2851,130 +2884,122 @@ export function ResourcesView({ namespaces, selectedResource, onResourceClick, o
             />
           </div>
 
-          {/* Filter dropdown */}
-          {filterOptions && (
-            <div className="relative" ref={filterDropdownRef}>
+          {/* Problems dropdown (pods only) */}
+          {filterOptions?.problems && filterOptions.problems.length > 0 && (
+            <div className="relative" ref={problemsDropdownRef}>
               <button
-                onClick={() => setShowFilterDropdown(!showFilterDropdown)}
+                onClick={() => { setShowProblemsDropdown(!showProblemsDropdown); setShowLabelsDropdown(false) }}
                 className={clsx(
-                  'flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-colors',
-                  hasActiveFilters
-                    ? 'bg-blue-500/20 text-blue-700 dark:text-blue-300 hover:bg-blue-500/30'
+                  'flex items-center gap-1.5 px-2.5 py-2 rounded-lg text-xs transition-colors',
+                  problemFilters.length > 0
+                    ? 'bg-red-500/20 text-red-700 dark:text-red-300 hover:bg-red-500/30'
                     : 'text-theme-text-secondary hover:text-theme-text-primary hover:bg-theme-elevated'
                 )}
               >
-                <Filter className="w-4 h-4" />
-                <span>Filter</span>
-                {hasActiveFilters && (
-                  <span className="px-1.5 py-0.5 text-xs bg-blue-500/30 text-blue-700 dark:text-blue-300 rounded">
-                    {Object.values(columnFilters).filter(v => v).length + problemFilters.length + activeLabelPairs.length}
+                <AlertTriangle className="w-3.5 h-3.5" />
+                <span>Problems</span>
+                {problemFilters.length > 0 && (
+                  <span className="px-1.5 py-0.5 text-xs bg-red-500/30 text-red-700 dark:text-red-300 rounded">
+                    {problemFilters.length}
                   </span>
                 )}
               </button>
-
-              {showFilterDropdown && (
-                <div className="absolute right-0 top-full mt-2 w-64 bg-theme-surface border border-theme-border rounded-lg shadow-xl z-50">
-                  <div className="p-3 border-b border-theme-border flex items-center justify-between">
-                    <span className="text-sm font-medium text-theme-text-primary">Filters</span>
-                    {hasActiveFilters && (
+              {showProblemsDropdown && (
+                <div className="absolute right-0 top-full mt-1 min-w-48 bg-theme-surface border border-theme-border rounded-lg shadow-xl z-50">
+                  {problemFilters.length > 0 && (
+                    <div className="flex items-center justify-between px-3 py-1.5 border-b border-theme-border">
+                      <span className="text-xs font-medium text-theme-text-secondary">Problems</span>
+                      <button onClick={() => { setProblemFilters([]); setShowProblemsDropdown(false) }} className="text-xs text-theme-text-tertiary hover:text-theme-text-primary px-1 py-0.5 -mr-1 rounded transition-colors">Clear</button>
+                    </div>
+                  )}
+                  <div className="py-1">
+                    {filterOptions.problems.map(({ value, count }) => (
                       <button
-                        onClick={clearFilters}
-                        className="text-xs text-theme-text-secondary hover:text-theme-text-primary"
+                        key={value}
+                        onClick={() => toggleProblemFilter(value)}
+                        className={clsx(
+                          'w-full text-left px-3 py-1.5 text-xs flex items-center justify-between gap-2 transition-colors',
+                          problemFilters.includes(value)
+                            ? 'bg-red-500/20 text-red-700 dark:text-red-300'
+                            : 'text-theme-text-secondary hover:bg-theme-elevated hover:text-theme-text-primary'
+                        )}
                       >
-                        Clear all
+                        <span className="truncate">{value}</span>
+                        <span className="text-theme-text-disabled shrink-0">({count})</span>
                       </button>
-                    )}
-                  </div>
-
-                  <div className="p-3 space-y-4 max-h-[28rem] overflow-y-auto">
-                    {/* Generic column filters */}
-                    {filterOptions.columns.map(({ key, label, values }) => (
-                      <div key={key}>
-                        <label className="text-xs font-medium text-theme-text-secondary uppercase tracking-wide mb-2 block">
-                          {label}
-                        </label>
-                        <div className="flex flex-wrap gap-1.5">
-                          {values.map(({ value, count }) => (
-                            <button
-                              key={value}
-                              onClick={() => setColumnFilters(prev => {
-                                const next = { ...prev }
-                                if (next[key] === value) {
-                                  delete next[key]
-                                } else {
-                                  next[key] = value
-                                }
-                                return next
-                              })}
-                              className={clsx(
-                                'px-2 py-1 text-xs rounded transition-colors',
-                                columnFilters[key] === value
-                                  ? 'bg-blue-500/30 text-blue-700 dark:text-blue-300'
-                                  : 'bg-theme-elevated text-theme-text-secondary hover:text-theme-text-primary'
-                              )}
-                            >
-                              {value} ({count})
-                            </button>
-                          ))}
-                        </div>
-                      </div>
                     ))}
-
-                    {/* Problem filter (pods only, multi-select) */}
-                    {filterOptions.problems && filterOptions.problems.length > 0 && (
-                      <div>
-                        <label className="text-xs font-medium text-theme-text-secondary uppercase tracking-wide mb-2 block">
-                          Problems
-                        </label>
-                        <div className="flex flex-wrap gap-1.5">
-                          {filterOptions.problems.map(({ value, count }) => (
-                            <button
-                              key={value}
-                              onClick={() => toggleProblemFilter(value)}
-                              className={clsx(
-                                'px-2 py-1 text-xs rounded transition-colors',
-                                problemFilters.includes(value)
-                                  ? 'bg-red-500/30 text-red-300'
-                                  : 'bg-theme-elevated text-theme-text-secondary hover:text-theme-text-primary'
-                              )}
-                            >
-                              {value} ({count})
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Label filter (multi-select) */}
-                    {filterOptions.labels && filterOptions.labels.length > 0 && (
-                      <div>
-                        <label className="text-xs font-medium text-theme-text-secondary uppercase tracking-wide mb-2 block">
-                          <span className="flex items-center gap-1">
-                            <Tag className="w-3 h-3" />
-                            Labels
-                          </span>
-                        </label>
-                        <div className="flex flex-wrap gap-1.5">
-                          {filterOptions.labels.map(({ value, count }) => (
-                            <button
-                              key={value}
-                              onClick={() => toggleLabelFilter(value)}
-                              className={clsx(
-                                'px-2 py-1 text-xs rounded transition-colors',
-                                activeLabelPairs.includes(value)
-                                  ? 'bg-green-500/30 text-green-700 dark:text-green-300'
-                                  : 'bg-theme-elevated text-theme-text-secondary hover:text-theme-text-primary'
-                              )}
-                            >
-                              {value} ({count})
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-                    )}
                   </div>
                 </div>
               )}
+            </div>
+          )}
+
+          {/* Labels dropdown */}
+          {filterOptions?.labels && filterOptions.labels.length > 0 && (
+            <div className="relative" ref={labelsDropdownRef}>
+              <button
+                onClick={() => { setShowLabelsDropdown(!showLabelsDropdown); setShowProblemsDropdown(false); setLabelSearch('') }}
+                className={clsx(
+                  'flex items-center gap-1.5 px-2.5 py-2 rounded-lg text-xs transition-colors',
+                  activeLabelPairs.length > 0
+                    ? 'bg-green-500/20 text-green-700 dark:text-green-300 hover:bg-green-500/30'
+                    : 'text-theme-text-secondary hover:text-theme-text-primary hover:bg-theme-elevated'
+                )}
+              >
+                <Tag className="w-3.5 h-3.5" />
+                <span>Labels</span>
+                {activeLabelPairs.length > 0 && (
+                  <span className="px-1.5 py-0.5 text-xs bg-green-500/30 text-green-700 dark:text-green-300 rounded">
+                    {activeLabelPairs.length}
+                  </span>
+                )}
+              </button>
+              {showLabelsDropdown && (() => {
+                const labels = filterOptions.labels ?? []
+                const filtered = labelSearch
+                  ? labels.filter(l => l.value.toLowerCase().includes(labelSearch.toLowerCase()))
+                  : labels
+                return (
+                  <div className="absolute right-0 top-full mt-1 min-w-64 max-w-80 bg-theme-surface border border-theme-border rounded-lg shadow-xl z-50">
+                    <div className="flex items-center gap-2 p-2 border-b border-theme-border">
+                      <div className="relative flex-1">
+                        <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-3 h-3 text-theme-text-tertiary" />
+                        <input
+                          type="text"
+                          placeholder="Search labels..."
+                          value={labelSearch}
+                          onChange={(e) => setLabelSearch(e.target.value)}
+                          autoFocus
+                          className="w-full pl-7 pr-2 py-1.5 text-xs bg-theme-elevated border border-theme-border-light rounded text-theme-text-primary placeholder-theme-text-disabled focus:outline-none focus:ring-1 focus:ring-blue-500"
+                        />
+                      </div>
+                      {activeLabelPairs.length > 0 && (
+                        <button onClick={() => { setLabelSelector(''); setShowLabelsDropdown(false) }} className="text-xs text-theme-text-tertiary hover:text-theme-text-primary px-1 py-0.5 rounded transition-colors shrink-0">Clear</button>
+                      )}
+                    </div>
+                    <div className="py-1 max-h-64 overflow-y-auto">
+                      {filtered.map(({ value, count }) => (
+                        <button
+                          key={value}
+                          onClick={() => toggleLabelFilter(value)}
+                          className={clsx(
+                            'w-full text-left px-3 py-1.5 text-xs flex items-center justify-between gap-2 transition-colors',
+                            activeLabelPairs.includes(value)
+                              ? 'bg-green-500/20 text-green-700 dark:text-green-300'
+                              : 'text-theme-text-secondary hover:bg-theme-elevated hover:text-theme-text-primary'
+                          )}
+                        >
+                          <span className="truncate" title={value}>{value}</span>
+                          <span className="text-theme-text-disabled shrink-0">({count})</span>
+                        </button>
+                      ))}
+                      {filtered.length === 0 && (
+                        <div className="px-3 py-2 text-xs text-theme-text-disabled">No matches</div>
+                      )}
+                    </div>
+                  </div>
+                )
+              })()}
             </div>
           )}
 
@@ -2991,57 +3016,24 @@ export function ResourcesView({ namespaces, selectedResource, onResourceClick, o
             </label>
           )}
 
-          {/* Active filter badges */}
-          {hasActiveFilters && (
-            <div className="flex items-center gap-2">
-              {Object.entries(columnFilters).filter(([, v]) => v).map(([key, value]) => (
-                <span key={key} className="flex items-center gap-1 px-2 py-1 text-xs bg-blue-500/20 text-blue-700 dark:text-blue-300 rounded">
-                  {value}
-                  <button onClick={() => setColumnFilters(prev => {
-                    const next = { ...prev }
-                    delete next[key]
-                    return next
-                  })} className="hover:text-theme-text-primary">
-                    <X className="w-3 h-3" />
-                  </button>
-                </span>
-              ))}
-              {problemFilters.map(p => (
-                <span key={p} className="flex items-center gap-1 px-2 py-1 text-xs bg-red-500/20 text-red-700 dark:text-red-300 rounded">
-                  {p}
-                  <button onClick={() => toggleProblemFilter(p)} className="hover:text-theme-text-primary">
-                    <X className="w-3 h-3" />
-                  </button>
-                </span>
-              ))}
-              {activeLabelPairs.map(pair => (
-                <span key={pair} className="flex items-center gap-1 px-2 py-1 text-xs bg-green-500/20 text-green-700 dark:text-green-300 rounded">
-                  <Tag className="w-3 h-3" />
-                  {pair}
-                  <button onClick={() => toggleLabelFilter(pair)} className="hover:text-theme-text-primary">
-                    <X className="w-3 h-3" />
-                  </button>
-                </span>
-              ))}
-              {hasOwnerFilter && (
-                <span className="flex items-center gap-1 px-2 py-1 text-xs bg-purple-500/20 text-purple-700 dark:text-purple-300 rounded">
-                  {ownerKind}: {ownerName}
-                  <button
-                    onClick={() => {
-                      setOwnerKind('')
-                      setOwnerName('')
-                      const params = new URLSearchParams(window.location.search)
-                      params.delete('ownerKind')
-                      params.delete('ownerName')
-                      window.history.replaceState({}, '', `${window.location.pathname}?${params.toString()}`)
-                    }}
-                    className="hover:text-theme-text-primary"
-                  >
-                    <X className="w-3 h-3" />
-                  </button>
-                </span>
-              )}
-            </div>
+          {/* Active filter badges — owner only (column filters shown on header, problems/labels on their buttons) */}
+          {hasOwnerFilter && (
+            <span className="flex items-center gap-1 px-2 py-1 text-xs bg-purple-500/20 text-purple-700 dark:text-purple-300 rounded">
+              {ownerKind}: {ownerName}
+              <button
+                onClick={() => {
+                  setOwnerKind('')
+                  setOwnerName('')
+                  const params = new URLSearchParams(window.location.search)
+                  params.delete('ownerKind')
+                  params.delete('ownerName')
+                  window.history.replaceState({}, '', `${window.location.pathname}?${params.toString()}`)
+                }}
+                className="hover:text-theme-text-primary"
+              >
+                <X className="w-3 h-3" />
+              </button>
+            </span>
           )}
 
           {lastUpdated && (
@@ -3125,6 +3117,46 @@ export function ResourcesView({ namespaces, selectedResource, onResourceClick, o
               <p>No {selectedKind.kind} found</p>
               {searchTerm && <p className="text-sm mt-1">No results for "{searchTerm}"</p>}
               {namespaces.length > 0 && <p className="text-sm mt-1 text-theme-text-disabled">Searching in {namespaces.length === 1 ? `namespace: ${namespaces[0]}` : `${namespaces.length} namespaces`}</p>}
+              {/* Show active filters as dismissible badges so user can clear them */}
+              {(() => {
+                const activeColEntries = Object.entries(columnFilters).filter(([, vals]) => vals.length > 0)
+                if (activeColEntries.length === 0 && problemFilters.length === 0 && !labelSelector) return null
+                return (
+                  <div className="flex flex-wrap items-center gap-1.5 mt-3">
+                    {activeColEntries.map(([key, vals]) => (
+                      <button
+                        key={key}
+                        onClick={() => clearColumnFilter(key)}
+                        className="flex items-center gap-1 px-2 py-1 text-xs bg-blue-500/15 text-blue-700 dark:text-blue-300 rounded-md hover:bg-blue-500/25 transition-colors"
+                      >
+                        <ListFilter className="w-3 h-3" />
+                        <span>{key}: {vals.join(', ')}</span>
+                        <X className="w-3 h-3" />
+                      </button>
+                    ))}
+                    {problemFilters.length > 0 && (
+                      <button
+                        onClick={() => setProblemFilters([])}
+                        className="flex items-center gap-1 px-2 py-1 text-xs bg-red-500/15 text-red-700 dark:text-red-300 rounded-md hover:bg-red-500/25 transition-colors"
+                      >
+                        <AlertTriangle className="w-3 h-3" />
+                        <span>Problems: {problemFilters.join(', ')}</span>
+                        <X className="w-3 h-3" />
+                      </button>
+                    )}
+                    {labelSelector && (
+                      <button
+                        onClick={() => setLabelSelector('')}
+                        className="flex items-center gap-1 px-2 py-1 text-xs bg-green-500/15 text-green-700 dark:text-green-300 rounded-md hover:bg-green-500/25 transition-colors"
+                      >
+                        <Tag className="w-3 h-3" />
+                        <span>{labelSelector}</span>
+                        <X className="w-3 h-3" />
+                      </button>
+                    )}
+                  </div>
+                )
+              })()}
             </div>
           ) : (
             <MetricsContext.Provider value={metricsLookup}>
@@ -3135,6 +3167,10 @@ export function ResourcesView({ namespaces, selectedResource, onResourceClick, o
                     const isSortable = ['name', 'namespace', 'age', 'status', 'ready', 'restarts', 'type', 'version', 'desired', 'available', 'upToDate', 'lastSeen', 'count', 'reason', 'object', 'cpu', 'memory'].includes(col.key)
                     const isSorted = sortColumn === col.key
                     const isLastCol = colIdx === columns.length - 1
+                    const filterCol = filterableColumnMap.get(col.key)
+                    const activeFilterValues = columnFilters[col.key] || []
+                    const hasActiveFilter = activeFilterValues.length > 0
+                    const isFilterOpen = openColumnFilter === col.key
                     return (
                       <th
                         key={col.key}
@@ -3167,7 +3203,115 @@ export function ResourcesView({ namespaces, selectedResource, onResourceClick, o
                               )}
                             </span>
                           )}
+                          {filterCol && (
+                            <span className="shrink-0 flex items-center gap-0">
+                              <button
+                                data-column-filter-trigger
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  if (isFilterOpen) {
+                                    setOpenColumnFilter(null)
+                                  } else {
+                                    setOpenColumnFilter(col.key)
+                                    setColumnFilterSearch('')
+                                  }
+                                }}
+                                className={clsx(
+                                  'rounded-l transition-colors flex items-center gap-0.5',
+                                  hasActiveFilter
+                                    ? 'px-1.5 py-0.5 -my-0.5 bg-blue-500/20 text-blue-700 dark:text-blue-300 hover:bg-blue-500/30'
+                                    : isFilterOpen
+                                      ? 'p-0.5 text-theme-text-primary'
+                                      : 'p-0.5 text-theme-text-disabled opacity-0 group-hover/th:opacity-100 hover:text-theme-text-primary'
+                                )}
+                              >
+                                <ListFilter className="w-3 h-3" />
+                                {hasActiveFilter && <span className="text-[10px] leading-none font-semibold">{activeFilterValues.length}</span>}
+                              </button>
+                              {hasActiveFilter && (
+                                <button
+                                  data-column-filter-trigger
+                                  onClick={(e) => {
+                                    e.stopPropagation()
+                                    clearColumnFilter(col.key)
+                                    setOpenColumnFilter(null)
+                                  }}
+                                  className="rounded-r px-0.5 py-0.5 -my-0.5 bg-blue-500/20 text-blue-700 dark:text-blue-300 hover:bg-blue-500/30 transition-colors"
+                                  title="Clear filter"
+                                >
+                                  <X className="w-3 h-3" />
+                                </button>
+                              )}
+                            </span>
+                          )}
                         </div>
+                        {/* Column filter dropdown */}
+                        {filterCol && isFilterOpen && (() => {
+                          const values = filterCol.values
+                          const filtered = columnFilterSearch
+                            ? values.filter(v => v.value.toLowerCase().includes(columnFilterSearch.toLowerCase()))
+                            : values
+                          return (
+                            <div
+                              ref={columnFilterDropdownRef}
+                              className={clsx(
+                                'absolute top-full mt-1 min-w-48 max-w-64 bg-theme-surface border border-theme-border rounded-lg shadow-xl z-50',
+                                isLastCol ? 'right-0' : 'left-0'
+                              )}
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              {values.length > 5 ? (
+                                <div className="flex items-center gap-2 p-2 border-b border-theme-border">
+                                  <div className="relative flex-1">
+                                    <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-3 h-3 text-theme-text-tertiary" />
+                                    <input
+                                      type="text"
+                                      placeholder="Search..."
+                                      value={columnFilterSearch}
+                                      onChange={(e) => setColumnFilterSearch(e.target.value)}
+                                      autoFocus
+                                      className="w-full pl-7 pr-2 py-1.5 text-xs bg-theme-elevated border border-theme-border-light rounded text-theme-text-primary placeholder-theme-text-disabled focus:outline-none focus:ring-1 focus:ring-blue-500"
+                                    />
+                                  </div>
+                                  {activeFilterValues.length > 0 && (
+                                    <button onClick={() => { clearColumnFilter(col.key); setOpenColumnFilter(null) }} className="text-xs text-theme-text-tertiary hover:text-theme-text-primary px-1 py-0.5 rounded transition-colors shrink-0">Clear</button>
+                                  )}
+                                </div>
+                              ) : activeFilterValues.length > 0 ? (
+                                <div className="flex items-center justify-between px-3 py-1.5 border-b border-theme-border">
+                                  <span className="text-xs font-medium text-theme-text-secondary">{col.label}</span>
+                                  <button onClick={() => { clearColumnFilter(col.key); setOpenColumnFilter(null) }} className="text-xs text-theme-text-tertiary hover:text-theme-text-primary px-1 py-0.5 -mr-1 rounded transition-colors">Clear</button>
+                                </div>
+                              ) : null}
+                              <div className="py-1 max-h-64 overflow-y-auto">
+                                {filtered.map(({ value, count }) => {
+                                  const isSelected = activeFilterValues.includes(value)
+                                  return (
+                                    <button
+                                      key={value}
+                                      onClick={() => toggleColumnFilterValue(col.key, value)}
+                                      className={clsx(
+                                        'w-full text-left px-3 py-1.5 text-xs flex items-center gap-2 transition-colors',
+                                        isSelected
+                                          ? 'bg-blue-500/20 text-blue-700 dark:text-blue-300'
+                                          : 'text-theme-text-secondary hover:bg-theme-elevated hover:text-theme-text-primary'
+                                      )}
+                                    >
+                                      <span className={clsx('w-3 h-3 shrink-0 rounded-sm border flex items-center justify-center', isSelected ? 'bg-blue-500 border-blue-500' : 'border-theme-border')}>
+                                        {isSelected && <Check className="w-2 h-2 text-white" />}
+                                      </span>
+                                      <span className="truncate" title={value}>{value}</span>
+                                      <span className="text-theme-text-disabled shrink-0 ml-auto">({count})</span>
+                                    </button>
+                                  )
+                                })}
+                                {filtered.length === 0 && (
+                                  <div className="px-3 py-2 text-xs text-theme-text-disabled">No matches</div>
+                                )}
+                              </div>
+                            </div>
+                          )
+                        })()}
                         {/* Resize handle with visible divider */}
                         <div
                           className="absolute right-0 top-0 bottom-0 w-3 cursor-col-resize flex items-center justify-center"
@@ -3671,6 +3815,7 @@ function PodCell({ resource, column }: { resource: any; column: string }) {
   const phase = resource.status?.phase
   const isCompleted = phase === 'Succeeded'
   const metrics = useContext(MetricsContext)
+  const navigate = useNavigate()
 
   switch (column) {
     case 'ready': {
@@ -3720,10 +3865,26 @@ function PodCell({ resource, column }: { resource: any; column: string }) {
       )
     }
     case 'node': {
-      const nodeName = resource.spec?.nodeName || '-'
+      const nodeVal = resource.spec?.nodeName || '-'
+      if (nodeVal === '-') {
+        return <span className="text-sm text-theme-text-tertiary">-</span>
+      }
       return (
-        <Tooltip content={nodeName}>
-          <span className="text-sm text-theme-text-secondary truncate block">{nodeName}</span>
+        <Tooltip content={`Filter pods on ${nodeVal}`}>
+          <button
+            onClick={(e) => {
+              e.stopPropagation()
+              // Merge node filter into existing column filters via URL
+              const params = new URLSearchParams(window.location.search)
+              const existing = parseColumnFilters(params.get('filters'))
+              existing['node'] = [nodeVal]
+              params.set('filters', serializeColumnFilters(existing))
+              navigate(`/resources/pods?${params.toString()}`)
+            }}
+            className="text-sm text-blue-400 hover:text-blue-300 hover:underline truncate block text-left"
+          >
+            {nodeVal}
+          </button>
         </Tooltip>
       )
     }

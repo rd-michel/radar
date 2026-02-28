@@ -47,10 +47,10 @@ restart: frontend embed backend kill
 	@sleep 4
 	@echo "Server running at http://localhost:$(PORT)"
 
-# Frontend-only rebuild and restart (faster - no Go recompile)
-restart-fe: frontend embed kill
+# Frontend-only rebuild and restart (faster - no Go recompile, serves from web/dist via --dev)
+restart-fe: frontend kill
 	@sleep 1
-	./radar --kubeconfig ~/.kube/config --no-browser --port $(PORT) $(RADAR_FLAGS) &
+	./radar --dev --kubeconfig ~/.kube/config --no-browser --port $(PORT) $(RADAR_FLAGS) &
 	@sleep 4
 	@echo "Server running at http://localhost:$(PORT)"
 

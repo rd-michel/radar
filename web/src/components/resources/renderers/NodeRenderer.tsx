@@ -1,9 +1,11 @@
-import { Server, HardDrive, Globe, Tag, Activity } from 'lucide-react'
+import { Server, HardDrive, Globe, Tag, Activity, ExternalLink } from 'lucide-react'
+import { useNavigate } from 'react-router-dom'
 import { clsx } from 'clsx'
 import { Section, PropertyList, Property, ConditionsSection, AlertBanner } from '../drawer-components'
 import { useNodeMetrics, useNodeMetricsHistory, usePrometheusResourceMetrics, usePrometheusStatus } from '../../../api/client'
 import { MetricsChart } from '../../ui/MetricsChart'
 import { formatMemoryString } from '../../../utils/format'
+import { serializeColumnFilters } from '../resource-utils'
 
 interface NodeRendererProps {
   data: any
@@ -68,6 +70,8 @@ export function NodeRenderer({ data, relationships }: NodeRendererProps) {
   const allocatable = status.allocatable || {}
   const addresses = status.addresses || []
   const taints = spec.taints || []
+
+  const navigate = useNavigate()
 
   // Check for problems
   const problems = getNodeProblems(data)
@@ -151,6 +155,21 @@ export function NodeRenderer({ data, relationships }: NodeRendererProps) {
             <span className="text-theme-text-primary">-</span>
           </div>
         </div>
+        {nodeName && (
+          <div className="mt-3 pt-3 border-t border-theme-border">
+            <button
+              onClick={() => {
+                const params = new URLSearchParams()
+                params.set('filters', serializeColumnFilters({ node: [nodeName] }))
+                navigate(`/resources/pods?${params.toString()}`)
+              }}
+              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-blue-400 hover:text-blue-300 bg-blue-500/10 hover:bg-blue-500/20 border border-blue-500/30 rounded transition-colors"
+            >
+              <ExternalLink className="w-3 h-3" />
+              View Pods
+            </button>
+          </div>
+        )}
       </Section>
 
       {/* Resource Usage (from metrics-server) — hidden when Prometheus has CPU/memory data */}

@@ -7,10 +7,10 @@ import { getCertificateStatus, getCertificateRequestStatus, getClusterIssuerStat
 import { getNodePoolStatus, getNodeClaimStatus } from './resource-utils-karpenter'
 import { getScaledObjectStatus, getScaledJobStatus } from './resource-utils-keda'
 import { getGitRepositoryStatus, getOCIRepositoryStatus, getHelmRepositoryStatus, getHelmRepositoryType, getKustomizationStatus, getFluxHelmReleaseStatus, getFluxAlertStatus } from './resource-utils-flux'
-import { getArgoApplicationStatus, getArgoApplicationSetStatus } from './resource-utils-argo'
+import { getArgoApplicationStatus, getArgoApplicationSetStatus, getArgoApplicationSync, getArgoApplicationHealth, getArgoApplicationProject } from './resource-utils-argo'
 import { getPolicyReportStatus as _getPolicyReportStatus, getKyvernoPolicyStatus as _getKyvernoPolicyStatus } from './resource-utils-kyverno'
 import { getBackupStatus as _getBackupStatus, getRestoreStatus as _getRestoreStatus, getScheduleStatus as _getScheduleStatus, getBSLStatus as _getBSLStatus } from './resource-utils-velero'
-import { getExternalSecretStatus as _getExternalSecretStatus, getClusterExternalSecretStatus as _getClusterExternalSecretStatus, getSecretStoreStatus as _getSecretStoreStatus, getClusterSecretStoreStatus as _getClusterSecretStoreStatus } from './resource-utils-eso'
+import { getExternalSecretStatus as _getExternalSecretStatus, getClusterExternalSecretStatus as _getClusterExternalSecretStatus, getSecretStoreStatus as _getSecretStoreStatus, getClusterSecretStoreStatus as _getClusterSecretStoreStatus, getSecretStoreProviderType as _getSecretStoreProviderType } from './resource-utils-eso'
 
 // ============================================================================
 // STATUS & HEALTH UTILITIES
@@ -1301,27 +1301,33 @@ export function formatResources(resources: any): string {
  * Used by the generic column filter system to match resources against filter values.
  * Reuses existing utility functions for kind-specific columns.
  */
-// Parse column filters from URL `filters` param (format: "col:val|col2:val2")
-// Uses `|` as pair separator so values can safely contain commas (e.g., "Ready,SchedulingDisabled")
-export function parseColumnFilters(filtersParam: string | null): Record<string, string> {
+// Parse column filters from URL `filters` param (format: "col:val1,val2|col2:val3")
+// Uses `|` as pair separator between columns, `,` between values within a column.
+// Multi-select: each column key maps to an array of selected values.
+export function parseColumnFilters(filtersParam: string | null): Record<string, string[]> {
   if (!filtersParam) return {}
-  const filters: Record<string, string> = {}
+  const filters: Record<string, string[]> = {}
   for (const pair of filtersParam.split('|')) {
     const colonIdx = pair.indexOf(':')
     if (colonIdx > 0) {
       const key = pair.slice(0, colonIdx).trim()
-      const value = pair.slice(colonIdx + 1).trim()
-      if (key && value) filters[key] = value
+      const valStr = pair.slice(colonIdx + 1).trim()
+      if (key && valStr) {
+        filters[key] = valStr.split(',').map(v => {
+          try { return decodeURIComponent(v.trim()) } catch { return v.trim() }
+        }).filter(Boolean)
+      }
     }
   }
   return filters
 }
 
 // Serialize column filters to URL param format
-export function serializeColumnFilters(filters: Record<string, string>): string {
+// Values are URI-encoded so commas inside values (e.g. "Ready,SchedulingDisabled") survive the round-trip.
+export function serializeColumnFilters(filters: Record<string, string[]>): string {
   const result = Object.entries(filters)
-    .filter(([, v]) => v)
-    .map(([k, v]) => `${k}:${v}`)
+    .filter(([, v]) => v.length > 0)
+    .map(([k, vals]) => `${k}:${vals.map(v => encodeURIComponent(v)).join(',')}`)
     .join('|')
   return result
 }
@@ -1420,6 +1426,23 @@ export function getCellFilterValue(resource: any, column: string, kind: string):
       return getServiceAccountAutomount(resource)
     case 'policyTypes':
       return getNetworkPolicyTypes(resource)
+    case 'node':
+      return resource.spec?.nodeName || ''
+    case 'version':
+      if (kindLower === 'nodes') return getNodeVersion(resource)
+      return resource.spec?.version || ''
+    case 'health':
+      if (kindLower === 'applications') return getArgoApplicationHealth(resource).status
+      return resource.status?.health?.status || ''
+    case 'sync':
+      if (kindLower === 'applications') return getArgoApplicationSync(resource).status
+      return resource.status?.sync?.status || ''
+    case 'project':
+      if (kindLower === 'applications') return getArgoApplicationProject(resource)
+      return resource.spec?.project || ''
+    case 'provider':
+      if (kindLower === 'secretstores' || kindLower === 'clustersecretstores') return _getSecretStoreProviderType(resource)
+      return resource.spec?.provider || ''
   }
 
   // Fallback: try common paths
