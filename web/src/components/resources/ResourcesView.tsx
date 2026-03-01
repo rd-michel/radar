@@ -1148,7 +1148,7 @@ const MetricsContext = React.createContext<MetricsLookup>({ pods: new Map(), nod
 interface ResourcesViewProps {
   namespaces: string[]
   selectedResource?: SelectedResource | null
-  onResourceClick?: NavigateToResource
+  onResourceClick?: (resource: SelectedResource | null) => void
   onResourceClickYaml?: NavigateToResource
   onKindChange?: () => void // Called when user changes resource type in sidebar
 }
@@ -1193,12 +1193,18 @@ function getInitialFiltersFromURL() {
 // Sort state type
 type SortDirection = 'asc' | 'desc' | null
 
+// Persisted across remounts so collapsed categories survive tab switches
+let persistedExpandedCategories: Set<string> | null = null
+let lastAutoExpandedKind: string | null = null
+
 export function ResourcesView({ namespaces, selectedResource, onResourceClick, onResourceClickYaml, onKindChange }: ResourcesViewProps) {
   const location = useLocation()
   const initialFilters = getInitialFiltersFromURL()
   const [selectedKind, setSelectedKind] = useState<SelectedKindInfo>(getInitialKindFromURL)
   const [searchTerm, setSearchTerm] = useState(initialFilters.search)
-  const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set(['Workloads', 'Networking', 'Configuration']))
+  const [expandedCategories, setExpandedCategories] = useState<Set<string>>(
+    () => persistedExpandedCategories ?? new Set(['Workloads', 'Networking', 'Configuration'])
+  )
   const [showEmptyKinds, setShowEmptyKinds] = useState(false)
   const [kindFilter, setKindFilter] = useState('')
   const [sortColumn, setSortColumn] = useState<string | null>(null)
@@ -1259,6 +1265,9 @@ export function ResourcesView({ namespaces, selectedResource, onResourceClick, o
   const { pinned, togglePin, isPinned } = usePinnedKinds()
   const [favoritesExpanded, setFavoritesExpanded] = useState(() => pinned.length > 0)
 
+  console.debug('[filters] ResourcesView render:', { kind: selectedKind.name, columnFilters, searchTerm, url: location.search })
+
+  useEffect(() => { persistedExpandedCategories = expandedCategories }, [expandedCategories])
   // Track if this is the initial mount to avoid re-syncing on first render
   const isInitialMount = useRef(true)
   const isSyncingFromURL = useRef(false)
@@ -1271,8 +1280,6 @@ export function ResourcesView({ namespaces, selectedResource, onResourceClick, o
   const selectedRowRef = useRef<HTMLTableCellElement>(null)
   // Ref to selected sidebar item for scrolling into view on deeplink
   const selectedSidebarRef = useRef<HTMLButtonElement>(null)
-  // Track what resource we last scrolled to, to avoid re-scrolling on group expand
-  const lastScrolledResource = useRef<string | null>(null)
   // Ref to search input for keyboard shortcut
   const searchInputRef = useRef<HTMLInputElement>(null)
   // Resize state
@@ -1917,8 +1924,12 @@ export function ResourcesView({ namespaces, selectedResource, onResourceClick, o
   }, [apiResources])
 
   // Auto-expand the sidebar category containing the selected kind (e.g., when deep-linking to a CRD)
+  // Skip if the kind hasn't changed since last auto-expand (preserves user's collapsed state on remount)
   useEffect(() => {
     if (!categories) return
+    const kindKey = `${selectedKind.group}/${selectedKind.kind}`
+    if (lastAutoExpandedKind === kindKey) return
+    lastAutoExpandedKind = kindKey
     for (const cat of categories) {
       const match = cat.resources.some(r => r.kind === selectedKind.kind || r.name === selectedKind.name)
       if (match && !expandedCategories.has(cat.name)) {
@@ -2358,20 +2369,13 @@ export function ResourcesView({ namespaces, selectedResource, onResourceClick, o
   highlightedResourceRef.current = highlightedIndex >= 0 ? filteredResources[highlightedIndex] ?? null : null
 
   // Scroll to selected row when selection changes (but not on group expand/filteredResources change)
+  const lastScrolledResource = useRef<string | null>(null)
   useEffect(() => {
-    if (!selectedResource) {
-      lastScrolledResource.current = null
-      return
-    }
-
-    // Create a key for the current selection
+    if (!selectedResource) return
     const resourceKey = `${selectedResource.kind}/${selectedResource.namespace}/${selectedResource.name}`
-
-    // Only scroll if this is a new selection
     if (lastScrolledResource.current === resourceKey) return
     lastScrolledResource.current = resourceKey
 
-    // Small delay to allow DOM to update, then scroll
     const timer = setTimeout(() => {
       selectedRowRef.current?.scrollIntoView({
         behavior: 'smooth',
@@ -2380,18 +2384,16 @@ export function ResourcesView({ namespaces, selectedResource, onResourceClick, o
     }, 100)
 
     return () => clearTimeout(timer)
-  }, [selectedResource]) // Only re-run when selection changes, NOT on filteredResources change
+  }, [selectedResource])
 
   // Scroll sidebar to show selected kind when deep linking (but not on manual category expand)
   const lastScrolledKind = useRef<string | null>(null)
   useEffect(() => {
     const kindKey = `${selectedKind.group}/${selectedKind.name}`
 
-    // Only scroll if the selected kind actually changed, not just category expansion
     if (lastScrolledKind.current === kindKey) return
     lastScrolledKind.current = kindKey
 
-    // Use requestAnimationFrame to ensure DOM is updated after category expansion
     requestAnimationFrame(() => {
       if (selectedSidebarRef.current) {
         selectedSidebarRef.current.scrollIntoView({
@@ -2400,7 +2402,7 @@ export function ResourcesView({ namespaces, selectedResource, onResourceClick, o
         })
       }
     })
-  }, [selectedKind.name, selectedKind.group, expandedCategories]) // Re-run after category expansion
+  }, [selectedKind.name, selectedKind.group, expandedCategories])
 
   // Calculate category totals, filter empty kinds/groups, and sort (empty categories at bottom)
   const { sortedCategories, hiddenKindsCount, hiddenGroupsCount } = useMemo(() => {
@@ -3101,7 +3103,15 @@ export function ResourcesView({ namespaces, selectedResource, onResourceClick, o
         </div>
 
         {/* Table */}
-        <div className="flex-1 overflow-y-auto overflow-x-hidden relative" ref={tableContainerRef}>
+        <div
+          className="flex-1 overflow-y-auto overflow-x-hidden relative"
+          ref={tableContainerRef}
+          onClick={(e) => {
+            if (e.target === e.currentTarget && selectedResource) {
+              onResourceClick?.(null)
+            }
+          }}
+        >
           {isLoading ? (
             <div className="absolute inset-0 flex items-center justify-center text-theme-text-tertiary">
               Loading...
@@ -3346,7 +3356,10 @@ export function ResourcesView({ namespaces, selectedResource, onResourceClick, o
                       isSelected={isSelected}
                       isHighlighted={isHighlighted}
                       majorityNodeMinorVersion={majorityNodeMinorVersion}
-                      onClick={() => onResourceClick?.({ kind: selectedKind.name, namespace: resource.metadata?.namespace || '', name: resource.metadata?.name, group: selectedKind.group })}
+                      onClick={() => {
+                        const res = { kind: selectedKind.name, namespace: resource.metadata?.namespace || '', name: resource.metadata?.name, group: selectedKind.group }
+                        onResourceClick?.(isSelected ? null : res)
+                      }}
                       onMouseEnter={() => setHighlightedIndex(-1)}
                     />
                   )
@@ -3452,14 +3465,14 @@ const ResourceRow = forwardRef<HTMLTableCellElement, ResourceRowProps>(
   function ResourceRow({ resource, kind, columns, hasSpacerColumn, isSelected, isHighlighted, majorityNodeMinorVersion, onClick, onMouseEnter }, ref) {
     return (
       <tr
-        onClick={onClick}
-        onMouseEnter={onMouseEnter}
         className="group/row contents"
       >
       {columns.map((col, i) => (
         <td
           key={col.key}
           ref={i === 0 ? ref : undefined}
+          onClick={onClick}
+          onMouseEnter={onMouseEnter}
           className={clsx(
             'px-4 py-3 border-b-subtle cursor-pointer transition-colors',
             col.key !== 'status' && 'overflow-hidden truncate',

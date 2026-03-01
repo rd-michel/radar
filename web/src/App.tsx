@@ -822,7 +822,7 @@ function AppInner() {
           <ResourcesView
             namespaces={namespaces}
             selectedResource={selectedResource}
-            onResourceClick={(res) => navigateToResource(res)}
+            onResourceClick={(res) => res ? navigateToResource(res) : setSelectedResource(null)}
             onResourceClickYaml={(res) => navigateToResource(res, 'yaml')}
             onKindChange={() => setSelectedResource(null)}
           />
