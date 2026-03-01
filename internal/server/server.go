@@ -610,6 +610,44 @@ func (s *Server) handleListResources(w http.ResponseWriter, r *http.Request) {
 		s.writeError(w, http.StatusForbidden, fmt.Sprintf("insufficient permissions to list %s", resourceKind))
 	}
 
+	// When a group is specified, skip the typed cache and use the dynamic cache
+	// directly. This handles CRDs whose plural name collides with core resources
+	// (e.g., KNative "services" vs core "services").
+	if group != "" {
+		if len(namespaces) > 0 {
+			var merged []any
+			for _, ns := range namespaces {
+				items, listErr := cache.ListDynamicWithGroup(r.Context(), kind, ns, group)
+				if listErr != nil {
+					if strings.Contains(listErr.Error(), "unknown resource kind") {
+						s.writeError(w, http.StatusBadRequest, listErr.Error())
+						return
+					}
+					s.writeError(w, http.StatusInternalServerError, listErr.Error())
+					return
+				}
+				for _, item := range items {
+					merged = append(merged, item)
+				}
+			}
+			result = merged
+		} else {
+			result, err = cache.ListDynamicWithGroup(r.Context(), kind, "", group)
+			if err != nil {
+				if strings.Contains(err.Error(), "unknown resource kind") {
+					s.writeError(w, http.StatusBadRequest, err.Error())
+					return
+				}
+				log.Printf("[resources] Failed to list %s (group=%s): %v", kind, group, err)
+				s.writeError(w, http.StatusInternalServerError, err.Error())
+				return
+			}
+		}
+
+		s.writeJSON(w, result)
+		return
+	}
+
 	// Try typed cache for known resource types first
 	switch kind {
 	case "pods":
@@ -856,6 +894,39 @@ func (s *Server) handleGetResource(w http.ResponseWriter, r *http.Request) {
 	// forbiddenGet returns a 403 error for RBAC-restricted resource types
 	forbiddenGet := func(resourceKind string) {
 		s.writeError(w, http.StatusForbidden, fmt.Sprintf("insufficient permissions to access %s", resourceKind))
+	}
+
+	// When a group is specified, skip the typed cache and use the dynamic cache
+	// directly. This handles CRDs whose plural name collides with core resources
+	// (e.g., KNative "services" vs core "services").
+	if group != "" {
+		resource, err = cache.GetDynamicWithGroup(r.Context(), kind, namespace, name, group)
+		if err != nil {
+			if strings.Contains(err.Error(), "unknown resource kind") {
+				s.writeError(w, http.StatusBadRequest, err.Error())
+				return
+			}
+			if strings.Contains(err.Error(), "not found") {
+				s.writeError(w, http.StatusNotFound, err.Error())
+				return
+			}
+			log.Printf("[resources] Failed to get %s %s/%s (group=%s): %v", kind, namespace, name, group, err)
+			s.writeError(w, http.StatusInternalServerError, err.Error())
+			return
+		}
+		setTypeMeta(resource)
+
+		// Get relationships from cached topology
+		var relationships *topology.Relationships
+		if cachedTopo := s.broadcaster.GetCachedTopology(); cachedTopo != nil {
+			relationships = topology.GetRelationships(kind, namespace, name, cachedTopo)
+		}
+
+		s.writeJSON(w, topology.ResourceWithRelationships{
+			Resource:      resource,
+			Relationships: relationships,
+		})
+		return
 	}
 
 	// Try typed cache for known resource types first

@@ -269,6 +269,17 @@ function pickGroupName(nodes: TopologyNode[]): string {
     'Secret': 10,
     'PersistentVolumeClaim': 10,
     'HorizontalPodAutoscaler': 10,
+    'KnativeService': 1,
+    'KnativeConfiguration': 3,
+    'KnativeRevision': 4,
+    'KnativeRoute': 2,
+    'Broker': 2,
+    'Channel': 2,
+    'Trigger': 3,
+    'PingSource': 3,
+    'ApiServerSource': 3,
+    'ContainerSource': 3,
+    'SinkBinding': 3,
   }
 
   // Sort by priority and pick the first

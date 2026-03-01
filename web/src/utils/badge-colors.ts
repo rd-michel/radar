@@ -43,6 +43,23 @@ export const KIND_BADGE_COLORS: Record<string, string> = {
   Node: 'bg-sky-500/15 text-sky-700 dark:bg-sky-900/50 dark:text-sky-300',
   Namespace: 'bg-gray-500/15 text-gray-700 dark:bg-gray-900/50 dark:text-gray-300',
 
+  // Knative Serving
+  KnativeService: 'bg-fuchsia-500/15 text-fuchsia-700 dark:bg-fuchsia-900/50 dark:text-fuchsia-300',
+  KnativeConfiguration: 'bg-fuchsia-500/15 text-fuchsia-700 dark:bg-fuchsia-900/50 dark:text-fuchsia-300',
+  KnativeRevision: 'bg-fuchsia-500/15 text-fuchsia-700 dark:bg-fuchsia-900/50 dark:text-fuchsia-300',
+  KnativeRoute: 'bg-fuchsia-500/15 text-fuchsia-700 dark:bg-fuchsia-900/50 dark:text-fuchsia-300',
+
+  // Knative Eventing
+  Broker: 'bg-fuchsia-500/15 text-fuchsia-700 dark:bg-fuchsia-900/50 dark:text-fuchsia-300',
+  Trigger: 'bg-fuchsia-500/15 text-fuchsia-700 dark:bg-fuchsia-900/50 dark:text-fuchsia-300',
+
+  // Knative Sources
+  PingSource: 'bg-fuchsia-500/15 text-fuchsia-700 dark:bg-fuchsia-900/50 dark:text-fuchsia-300',
+  ApiServerSource: 'bg-fuchsia-500/15 text-fuchsia-700 dark:bg-fuchsia-900/50 dark:text-fuchsia-300',
+  ContainerSource: 'bg-fuchsia-500/15 text-fuchsia-700 dark:bg-fuchsia-900/50 dark:text-fuchsia-300',
+  SinkBinding: 'bg-fuchsia-500/15 text-fuchsia-700 dark:bg-fuchsia-900/50 dark:text-fuchsia-300',
+  Channel: 'bg-fuchsia-500/15 text-fuchsia-700 dark:bg-fuchsia-900/50 dark:text-fuchsia-300',
+
   // Special
   HelmRelease: 'bg-purple-500/20 text-purple-700 dark:text-purple-300',
   Event: 'bg-slate-500/15 text-slate-700 dark:bg-slate-900/50 dark:text-slate-300',
@@ -91,6 +108,19 @@ export const KIND_BADGE_BORDERED: Record<string, string> = {
   // Cluster-scoped
   Node: 'bg-sky-500/20 text-sky-700 dark:text-sky-300 border border-sky-500/30',
   Namespace: 'bg-gray-500/20 text-gray-700 dark:text-gray-300 border border-gray-500/30',
+
+  // Knative
+  KnativeService: 'bg-fuchsia-500/20 text-fuchsia-700 dark:text-fuchsia-300 border border-fuchsia-500/30',
+  KnativeConfiguration: 'bg-fuchsia-500/20 text-fuchsia-700 dark:text-fuchsia-300 border border-fuchsia-500/30',
+  KnativeRevision: 'bg-fuchsia-500/20 text-fuchsia-700 dark:text-fuchsia-300 border border-fuchsia-500/30',
+  KnativeRoute: 'bg-fuchsia-500/20 text-fuchsia-700 dark:text-fuchsia-300 border border-fuchsia-500/30',
+  Broker: 'bg-fuchsia-500/20 text-fuchsia-700 dark:text-fuchsia-300 border border-fuchsia-500/30',
+  Trigger: 'bg-fuchsia-500/20 text-fuchsia-700 dark:text-fuchsia-300 border border-fuchsia-500/30',
+  PingSource: 'bg-fuchsia-500/20 text-fuchsia-700 dark:text-fuchsia-300 border border-fuchsia-500/30',
+  ApiServerSource: 'bg-fuchsia-500/20 text-fuchsia-700 dark:text-fuchsia-300 border border-fuchsia-500/30',
+  ContainerSource: 'bg-fuchsia-500/20 text-fuchsia-700 dark:text-fuchsia-300 border border-fuchsia-500/30',
+  SinkBinding: 'bg-fuchsia-500/20 text-fuchsia-700 dark:text-fuchsia-300 border border-fuchsia-500/30',
+  Channel: 'bg-fuchsia-500/20 text-fuchsia-700 dark:text-fuchsia-300 border border-fuchsia-500/30',
 }
 
 // Event type colors - for K8s event types (Normal, Warning)

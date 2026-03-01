@@ -1190,6 +1190,332 @@ func (b *Builder) buildResourcesTopology(opts BuildOptions) (*Topology, error) {
 		}
 	}
 
+	// 1n. Add KNative Serving nodes (CRD - fetched via dynamic cache)
+	// KnativeService, Configuration, Revision, Route
+	// Edges are created in a second pass after all IDs are populated
+
+	// KNative Service (collides with core Service kind, use GetGVRWithGroup)
+	var knativeServiceGVR schema.GroupVersionResource
+	hasKnativeServices := false
+	if resourceDiscovery != nil {
+		knativeServiceGVR, hasKnativeServices = resourceDiscovery.GetGVRWithGroup("Service", "serving.knative.dev")
+	}
+	knativeServiceIDs := make(map[string]string)                          // ns/name -> ksvcID
+	var knativeServiceResources []*unstructured.Unstructured              // Store for second pass
+	if hasKnativeServices && dynamicCache != nil {
+		knativeServices, ksvcErr := dynamicCache.List(knativeServiceGVR, opts.NamespaceFilter())
+		if ksvcErr != nil {
+			log.Printf("WARNING [topology] Failed to list KNative Services: %v", ksvcErr)
+			warnings = append(warnings, fmt.Sprintf("Failed to list KNative Services: %v", ksvcErr))
+		}
+		for _, ksvc := range knativeServices {
+			ns := ksvc.GetNamespace()
+			if !opts.MatchesNamespaceFilter(ns) {
+				continue
+			}
+			name := ksvc.GetName()
+
+			ksvcID := fmt.Sprintf("knativeservice/%s/%s", ns, name)
+			knativeServiceIDs[ns+"/"+name] = ksvcID
+
+			nodes = append(nodes, Node{
+				ID:     ksvcID,
+				Kind:   KindKnativeService,
+				Name:   name,
+				Status: extractGenericStatus(ksvc),
+				Data: map[string]any{
+					"namespace": ns,
+					"labels":    ksvc.GetLabels(),
+				},
+			})
+
+			knativeServiceResources = append(knativeServiceResources, ksvc)
+		}
+	}
+
+	// KNative Configuration (needs group-qualified lookup — "Configuration" could collide with other CRDs)
+	var knativeConfigGVR schema.GroupVersionResource
+	hasKnativeConfigs := false
+	if resourceDiscovery != nil {
+		knativeConfigGVR, hasKnativeConfigs = resourceDiscovery.GetGVRWithGroup("Configuration", "serving.knative.dev")
+	}
+	knativeConfigIDs := make(map[string]string)                              // ns/name -> kcfgID
+	var knativeConfigResources []*unstructured.Unstructured                  // Store for edge creation
+	if hasKnativeConfigs && dynamicCache != nil {
+		knativeConfigs, kcfgErr := dynamicCache.List(knativeConfigGVR, opts.NamespaceFilter())
+		if kcfgErr != nil {
+			log.Printf("WARNING [topology] Failed to list KNative Configurations: %v", kcfgErr)
+			warnings = append(warnings, fmt.Sprintf("Failed to list KNative Configurations: %v", kcfgErr))
+		}
+		for _, kcfg := range knativeConfigs {
+			ns := kcfg.GetNamespace()
+			if !opts.MatchesNamespaceFilter(ns) {
+				continue
+			}
+			name := kcfg.GetName()
+
+			kcfgID := fmt.Sprintf("knativeconfiguration/%s/%s", ns, name)
+			knativeConfigIDs[ns+"/"+name] = kcfgID
+			knativeConfigResources = append(knativeConfigResources, kcfg)
+
+			nodes = append(nodes, Node{
+				ID:     kcfgID,
+				Kind:   KindKnativeConfiguration,
+				Name:   name,
+				Status: extractGenericStatus(kcfg),
+				Data: map[string]any{
+					"namespace": ns,
+					"labels":    kcfg.GetLabels(),
+				},
+			})
+		}
+	}
+
+	// KNative Revision (no collision, use GetGVR)
+	var knativeRevisionGVR schema.GroupVersionResource
+	hasKnativeRevisions := false
+	if resourceDiscovery != nil {
+		knativeRevisionGVR, hasKnativeRevisions = resourceDiscovery.GetGVR("Revision")
+	}
+	knativeRevisionIDs := make(map[string]string)                              // ns/name -> krevID
+	var knativeRevisionResources []*unstructured.Unstructured                  // Store for edge creation
+	if hasKnativeRevisions && dynamicCache != nil {
+		knativeRevisions, krevErr := dynamicCache.List(knativeRevisionGVR, opts.NamespaceFilter())
+		if krevErr != nil {
+			log.Printf("WARNING [topology] Failed to list KNative Revisions: %v", krevErr)
+			warnings = append(warnings, fmt.Sprintf("Failed to list KNative Revisions: %v", krevErr))
+		}
+		for _, krev := range knativeRevisions {
+			ns := krev.GetNamespace()
+			if !opts.MatchesNamespaceFilter(ns) {
+				continue
+			}
+			name := krev.GetName()
+
+			krevID := fmt.Sprintf("knativerevision/%s/%s", ns, name)
+			knativeRevisionIDs[ns+"/"+name] = krevID
+			knativeRevisionResources = append(knativeRevisionResources, krev)
+
+			nodes = append(nodes, Node{
+				ID:     krevID,
+				Kind:   KindKnativeRevision,
+				Name:   name,
+				Status: extractGenericStatus(krev),
+				Data: map[string]any{
+					"namespace": ns,
+					"labels":    krev.GetLabels(),
+				},
+			})
+		}
+	}
+
+	// KNative Route (needs group-qualified lookup — "Route" could collide with Gateway API or other CRDs)
+	var knativeRouteGVR schema.GroupVersionResource
+	hasKnativeRoutes := false
+	if resourceDiscovery != nil {
+		knativeRouteGVR, hasKnativeRoutes = resourceDiscovery.GetGVRWithGroup("Route", "serving.knative.dev")
+	}
+	knativeRouteIDs := make(map[string]string)                          // ns/name -> krouteID
+	var knativeRouteResources []*unstructured.Unstructured              // Store for second pass
+	if hasKnativeRoutes && dynamicCache != nil {
+		knativeRoutes, krouteErr := dynamicCache.List(knativeRouteGVR, opts.NamespaceFilter())
+		if krouteErr != nil {
+			log.Printf("WARNING [topology] Failed to list KNative Routes: %v", krouteErr)
+			warnings = append(warnings, fmt.Sprintf("Failed to list KNative Routes: %v", krouteErr))
+		}
+		for _, kroute := range knativeRoutes {
+			ns := kroute.GetNamespace()
+			if !opts.MatchesNamespaceFilter(ns) {
+				continue
+			}
+			name := kroute.GetName()
+
+			krouteID := fmt.Sprintf("knativeroute/%s/%s", ns, name)
+			knativeRouteIDs[ns+"/"+name] = krouteID
+
+			nodes = append(nodes, Node{
+				ID:     krouteID,
+				Kind:   KindKnativeRoute,
+				Name:   name,
+				Status: extractGenericStatus(kroute),
+				Data: map[string]any{
+					"namespace": ns,
+					"labels":    kroute.GetLabels(),
+				},
+			})
+
+			knativeRouteResources = append(knativeRouteResources, kroute)
+		}
+	}
+
+	// 1o. Add KNative Eventing nodes (CRD - fetched via dynamic cache)
+	// Broker, Trigger, PingSource, ApiServerSource, ContainerSource, SinkBinding
+
+	// KNative Broker (needs group-qualified lookup — "Broker" could collide with messaging CRDs)
+	var knativeBrokerGVR schema.GroupVersionResource
+	hasKnativeBrokers := false
+	if resourceDiscovery != nil {
+		knativeBrokerGVR, hasKnativeBrokers = resourceDiscovery.GetGVRWithGroup("Broker", "eventing.knative.dev")
+	}
+	knativeBrokerIDs := make(map[string]string) // ns/name -> brokerID
+	if hasKnativeBrokers && dynamicCache != nil {
+		knativeBrokers, brokerErr := dynamicCache.List(knativeBrokerGVR, opts.NamespaceFilter())
+		if brokerErr != nil {
+			log.Printf("WARNING [topology] Failed to list KNative Brokers: %v", brokerErr)
+			warnings = append(warnings, fmt.Sprintf("Failed to list KNative Brokers: %v", brokerErr))
+		}
+		for _, broker := range knativeBrokers {
+			ns := broker.GetNamespace()
+			if !opts.MatchesNamespaceFilter(ns) {
+				continue
+			}
+			name := broker.GetName()
+
+			brokerID := fmt.Sprintf("broker/%s/%s", ns, name)
+			knativeBrokerIDs[ns+"/"+name] = brokerID
+
+			nodes = append(nodes, Node{
+				ID:     brokerID,
+				Kind:   KindBroker,
+				Name:   name,
+				Status: extractGenericStatus(broker),
+				Data: map[string]any{
+					"namespace": ns,
+					"labels":    broker.GetLabels(),
+				},
+			})
+		}
+	}
+
+	// KNative Trigger (needs group-qualified lookup — "Trigger" could collide with KEDA or other CRDs)
+	var knativeTriggerGVR schema.GroupVersionResource
+	hasKnativeTriggers := false
+	if resourceDiscovery != nil {
+		knativeTriggerGVR, hasKnativeTriggers = resourceDiscovery.GetGVRWithGroup("Trigger", "eventing.knative.dev")
+	}
+	knativeTriggerIDs := make(map[string]string)                        // ns/name -> triggerID
+	var knativeTriggerResources []*unstructured.Unstructured            // Store for second pass
+	if hasKnativeTriggers && dynamicCache != nil {
+		knativeTriggers, triggerErr := dynamicCache.List(knativeTriggerGVR, opts.NamespaceFilter())
+		if triggerErr != nil {
+			log.Printf("WARNING [topology] Failed to list KNative Triggers: %v", triggerErr)
+			warnings = append(warnings, fmt.Sprintf("Failed to list KNative Triggers: %v", triggerErr))
+		}
+		for _, trigger := range knativeTriggers {
+			ns := trigger.GetNamespace()
+			if !opts.MatchesNamespaceFilter(ns) {
+				continue
+			}
+			name := trigger.GetName()
+
+			triggerID := fmt.Sprintf("trigger/%s/%s", ns, name)
+			knativeTriggerIDs[ns+"/"+name] = triggerID
+
+			nodes = append(nodes, Node{
+				ID:     triggerID,
+				Kind:   KindTrigger,
+				Name:   name,
+				Status: extractGenericStatus(trigger),
+				Data: map[string]any{
+					"namespace": ns,
+					"labels":    trigger.GetLabels(),
+				},
+			})
+
+			knativeTriggerResources = append(knativeTriggerResources, trigger)
+		}
+	}
+
+	// KNative event sources: PingSource, ApiServerSource, ContainerSource, SinkBinding
+	type knativeSourceDef struct {
+		kind     string
+		nodeKind NodeKind
+		prefix   string
+	}
+	knativeSourceDefs := []knativeSourceDef{
+		{"PingSource", KindPingSource, "pingsource"},
+		{"ApiServerSource", KindApiServerSource, "apiserversource"},
+		{"ContainerSource", KindContainerSource, "containersource"},
+		{"SinkBinding", KindSinkBinding, "sinkbinding"},
+	}
+	var knativeSourceResources []*unstructured.Unstructured // Store all sources for second pass edge creation
+	knativeSourceKinds := make(map[*unstructured.Unstructured]knativeSourceDef)
+	for _, srcDef := range knativeSourceDefs {
+		var srcGVR schema.GroupVersionResource
+		hasSrc := false
+		if resourceDiscovery != nil {
+			srcGVR, hasSrc = resourceDiscovery.GetGVR(srcDef.kind)
+		}
+		if !hasSrc || dynamicCache == nil {
+			continue
+		}
+		sources, srcErr := dynamicCache.List(srcGVR, opts.NamespaceFilter())
+		if srcErr != nil {
+			log.Printf("WARNING [topology] Failed to list KNative %s: %v", srcDef.kind, srcErr)
+			warnings = append(warnings, fmt.Sprintf("Failed to list KNative %s: %v", srcDef.kind, srcErr))
+			continue
+		}
+		for _, src := range sources {
+			ns := src.GetNamespace()
+			if !opts.MatchesNamespaceFilter(ns) {
+				continue
+			}
+			name := src.GetName()
+
+			srcID := fmt.Sprintf("%s/%s/%s", srcDef.prefix, ns, name)
+
+			nodes = append(nodes, Node{
+				ID:     srcID,
+				Kind:   srcDef.nodeKind,
+				Name:   name,
+				Status: extractGenericStatus(src),
+				Data: map[string]any{
+					"namespace": ns,
+					"labels":    src.GetLabels(),
+				},
+			})
+
+			knativeSourceResources = append(knativeSourceResources, src)
+			knativeSourceKinds[src] = srcDef
+		}
+	}
+
+	// KNative Channel (needs group-qualified lookup — "Channel" could collide with other CRDs)
+	var knativeChannelGVR schema.GroupVersionResource
+	hasKnativeChannels := false
+	if resourceDiscovery != nil {
+		knativeChannelGVR, hasKnativeChannels = resourceDiscovery.GetGVRWithGroup("Channel", "messaging.knative.dev")
+	}
+	knativeChannelIDs := make(map[string]string) // ns/name -> channelID
+	if hasKnativeChannels && dynamicCache != nil {
+		knativeChannels, chanErr := dynamicCache.List(knativeChannelGVR, opts.NamespaceFilter())
+		if chanErr != nil {
+			log.Printf("WARNING [topology] Failed to list KNative Channels: %v", chanErr)
+			warnings = append(warnings, fmt.Sprintf("Failed to list KNative Channels: %v", chanErr))
+		}
+		for _, ch := range knativeChannels {
+			ns := ch.GetNamespace()
+			if !opts.MatchesNamespaceFilter(ns) {
+				continue
+			}
+			name := ch.GetName()
+
+			chID := fmt.Sprintf("channel/%s/%s", ns, name)
+			knativeChannelIDs[ns+"/"+name] = chID
+
+			nodes = append(nodes, Node{
+				ID:     chID,
+				Kind:   KindChannel,
+				Name:   name,
+				Status: extractGenericStatus(ch),
+				Data: map[string]any{
+					"namespace": ns,
+					"labels":    ch.GetLabels(),
+				},
+			})
+		}
+	}
+
 	// 2. Add DaemonSet nodes
 	var daemonsets []*appsv1.DaemonSet
 	if lister := b.cache.DaemonSets(); lister != nil {
@@ -2816,6 +3142,244 @@ func (b *Builder) buildResourcesTopology(opts BuildOptions) (*Topology, error) {
 		}
 	}
 
+	// 14d. Create KNative Serving edges
+
+	// Owner-ref edges: KnativeService → Configuration, KnativeService → Route, etc.
+
+	// Configuration ownerRef → KnativeService (reuse resources from phase 1)
+	for _, kcfg := range knativeConfigResources {
+		ns := kcfg.GetNamespace()
+		name := kcfg.GetName()
+		kcfgID := knativeConfigIDs[ns+"/"+name]
+		if kcfgID == "" {
+			continue
+		}
+		for _, ref := range kcfg.GetOwnerReferences() {
+			if ref.Kind == "Service" && strings.Contains(ref.APIVersion, "serving.knative.dev") {
+				if ownerID, ok := knativeServiceIDs[ns+"/"+ref.Name]; ok {
+					edges = append(edges, Edge{
+						ID:     fmt.Sprintf("%s-to-%s", ownerID, kcfgID),
+						Source: ownerID,
+						Target: kcfgID,
+						Type:   EdgeManages,
+					})
+				}
+			}
+		}
+	}
+	// Route ownerRef → KnativeService
+	for _, kroute := range knativeRouteResources {
+		ns := kroute.GetNamespace()
+		name := kroute.GetName()
+		krouteID := knativeRouteIDs[ns+"/"+name]
+		if krouteID == "" {
+			continue
+		}
+		for _, ref := range kroute.GetOwnerReferences() {
+			if ref.Kind == "Service" && strings.Contains(ref.APIVersion, "serving.knative.dev") {
+				if ownerID, ok := knativeServiceIDs[ns+"/"+ref.Name]; ok {
+					edges = append(edges, Edge{
+						ID:     fmt.Sprintf("%s-to-%s", ownerID, krouteID),
+						Source: ownerID,
+						Target: krouteID,
+						Type:   EdgeManages,
+					})
+				}
+			}
+		}
+	}
+	// Revision ownerRef → Configuration (reuse resources from phase 1)
+	for _, krev := range knativeRevisionResources {
+		ns := krev.GetNamespace()
+		name := krev.GetName()
+		krevID := knativeRevisionIDs[ns+"/"+name]
+		if krevID == "" {
+			continue
+		}
+		for _, ref := range krev.GetOwnerReferences() {
+			if ref.Kind == "Configuration" {
+				if ownerID, ok := knativeConfigIDs[ns+"/"+ref.Name]; ok {
+					edges = append(edges, Edge{
+						ID:     fmt.Sprintf("%s-to-%s", ownerID, krevID),
+						Source: ownerID,
+						Target: krevID,
+						Type:   EdgeManages,
+					})
+				}
+			}
+		}
+	}
+	// Deployment ownerRef → Revision (KNative Revision owns the K8s Deployment)
+	for _, deploy := range deployments {
+		if !opts.MatchesNamespaceFilter(deploy.Namespace) {
+			continue
+		}
+		for _, ref := range deploy.OwnerReferences {
+			if ref.Kind == "Revision" && strings.Contains(ref.APIVersion, "serving.knative.dev") {
+				deployID := deploymentIDs[deploy.Namespace+"/"+deploy.Name]
+				if krevID, ok := knativeRevisionIDs[deploy.Namespace+"/"+ref.Name]; ok && deployID != "" {
+					edges = append(edges, Edge{
+						ID:     fmt.Sprintf("%s-to-%s", krevID, deployID),
+						Source: krevID,
+						Target: deployID,
+						Type:   EdgeManages,
+					})
+				}
+			}
+		}
+	}
+
+	// KnativeRoute → KnativeRevision (EdgeExposes, via status.traffic[].revisionName)
+	// Note: spec.traffic may use configurationName instead of revisionName;
+	// status.traffic always has the resolved revisionName.
+	for _, kroute := range knativeRouteResources {
+		krouteNs := kroute.GetNamespace()
+		krouteName := kroute.GetName()
+		krouteID := knativeRouteIDs[krouteNs+"/"+krouteName]
+
+		trafficTargets, _, _ := unstructured.NestedSlice(kroute.Object, "status", "traffic")
+		for _, tt := range trafficTargets {
+			ttMap, ok := tt.(map[string]any)
+			if !ok {
+				continue
+			}
+			revName, _, _ := unstructured.NestedString(ttMap, "revisionName")
+			if revName == "" {
+				continue
+			}
+			if krevID, ok := knativeRevisionIDs[krouteNs+"/"+revName]; ok {
+				edges = append(edges, Edge{
+					ID:     fmt.Sprintf("%s-to-%s", krouteID, krevID),
+					Source: krouteID,
+					Target: krevID,
+					Type:   EdgeExposes,
+				})
+			}
+		}
+	}
+
+	// KnativeService → K8s Services (EdgeExposes)
+	// Connects to: same-name service (ExternalName DNS alias) + per-revision private services (actual pod routing)
+	for _, ksvc := range knativeServiceResources {
+		ksvcNs := ksvc.GetNamespace()
+		ksvcName := ksvc.GetName()
+		ksvcID := knativeServiceIDs[ksvcNs+"/"+ksvcName]
+
+		// Same-name service (ExternalName)
+		if svcID, ok := serviceIDs[ksvcNs+"/"+ksvcName]; ok {
+			edges = append(edges, Edge{
+				ID:     fmt.Sprintf("%s-to-%s", ksvcID, svcID),
+				Source: ksvcID,
+				Target: svcID,
+				Type:   EdgeExposes,
+			})
+		}
+
+		// Per-revision private services (from status.traffic)
+		trafficTargets, _, _ := unstructured.NestedSlice(ksvc.Object, "status", "traffic")
+		for _, tt := range trafficTargets {
+			ttMap, ok := tt.(map[string]any)
+			if !ok {
+				continue
+			}
+			revName, _, _ := unstructured.NestedString(ttMap, "revisionName")
+			if revName == "" {
+				continue
+			}
+			privateSvcKey := ksvcNs + "/" + revName + "-private"
+			if svcID, ok := serviceIDs[privateSvcKey]; ok {
+				edges = append(edges, Edge{
+					ID:     fmt.Sprintf("%s-to-%s", ksvcID, svcID),
+					Source: ksvcID,
+					Target: svcID,
+					Type:   EdgeExposes,
+				})
+			}
+		}
+		// Fallback: use latestReadyRevisionName
+		if len(trafficTargets) == 0 {
+			latestRev, _, _ := unstructured.NestedString(ksvc.Object, "status", "latestReadyRevisionName")
+			if latestRev != "" {
+				privateSvcKey := ksvcNs + "/" + latestRev + "-private"
+				if svcID, ok := serviceIDs[privateSvcKey]; ok {
+					edges = append(edges, Edge{
+						ID:     fmt.Sprintf("%s-to-%s", ksvcID, svcID),
+						Source: ksvcID,
+						Target: svcID,
+						Type:   EdgeExposes,
+					})
+				}
+			}
+		}
+	}
+
+	// 14e. Create KNative Eventing edges
+	// Broker → Trigger (EdgeExposes — Broker routes events to Triggers)
+	// Trigger → subscriber target (EdgeExposes, via spec.subscriber.ref)
+	for _, trigger := range knativeTriggerResources {
+		triggerNs := trigger.GetNamespace()
+		triggerName := trigger.GetName()
+		triggerID := knativeTriggerIDs[triggerNs+"/"+triggerName]
+
+		// Broker → Trigger (data flow: Broker dispatches events to matching Triggers)
+		brokerName, _, _ := unstructured.NestedString(trigger.Object, "spec", "broker")
+		if brokerName != "" {
+			if brokerID, ok := knativeBrokerIDs[triggerNs+"/"+brokerName]; ok {
+				edges = append(edges, Edge{
+					ID:     fmt.Sprintf("%s-to-%s", brokerID, triggerID),
+					Source: brokerID,
+					Target: triggerID,
+					Type:   EdgeExposes,
+				})
+			}
+		}
+
+		// Trigger → subscriber target
+		subRefKind, _, _ := unstructured.NestedString(trigger.Object, "spec", "subscriber", "ref", "kind")
+		subRefName, _, _ := unstructured.NestedString(trigger.Object, "spec", "subscriber", "ref", "name")
+		subRefNs, _, _ := unstructured.NestedString(trigger.Object, "spec", "subscriber", "ref", "namespace")
+		if subRefNs == "" {
+			subRefNs = triggerNs
+		}
+		if subRefKind != "" && subRefName != "" {
+			targetID := resolveKnativeRef(subRefKind, subRefNs, subRefName, serviceIDs, knativeServiceIDs, knativeBrokerIDs, knativeChannelIDs)
+			if targetID != "" {
+				edges = append(edges, Edge{
+					ID:     fmt.Sprintf("%s-sub-to-%s", triggerID, targetID),
+					Source: triggerID,
+					Target: targetID,
+					Type:   EdgeExposes,
+				})
+			}
+		}
+	}
+
+	// Sources → sink target (EdgeExposes, via spec.sink.ref)
+	for _, src := range knativeSourceResources {
+		srcDef := knativeSourceKinds[src]
+		srcNs := src.GetNamespace()
+		srcName := src.GetName()
+		srcID := fmt.Sprintf("%s/%s/%s", srcDef.prefix, srcNs, srcName)
+
+		sinkRefKind, _, _ := unstructured.NestedString(src.Object, "spec", "sink", "ref", "kind")
+		sinkRefName, _, _ := unstructured.NestedString(src.Object, "spec", "sink", "ref", "name")
+		sinkRefNs, _, _ := unstructured.NestedString(src.Object, "spec", "sink", "ref", "namespace")
+		if sinkRefNs == "" {
+			sinkRefNs = srcNs
+		}
+		if sinkRefKind != "" && sinkRefName != "" {
+			targetID := resolveKnativeRef(sinkRefKind, sinkRefNs, sinkRefName, serviceIDs, knativeServiceIDs, knativeBrokerIDs, knativeChannelIDs)
+			if targetID != "" {
+				edges = append(edges, Edge{
+					ID:     fmt.Sprintf("%s-sink-to-%s", srcID, targetID),
+					Source: srcID,
+					Target: targetID,
+					Type:   EdgeExposes,
+				})
+			}
+		}
+	}
+
 	// 15. Create Gateway API edges (Gateway → Route, Route → Service)
 	for i, route := range gatewayRouteResources {
 		ns := route.GetNamespace()
@@ -3065,6 +3629,20 @@ func (b *Builder) buildTrafficTopology(opts BuildOptions) (*Topology, error) {
 		}
 	}
 
+	// Collect KNative Serving resources from dynamic cache
+	var trafficKnativeServices []*unstructured.Unstructured
+	if trafficDynamicCache != nil && trafficResourceDiscovery != nil {
+		if ksvcGVR, ok := trafficResourceDiscovery.GetGVRWithGroup("Service", "serving.knative.dev"); ok {
+			ksvcs, err := trafficDynamicCache.List(ksvcGVR, opts.NamespaceFilter())
+			if err != nil {
+				log.Printf("WARNING [topology/traffic] Failed to list KNative Services: %v", err)
+				warnings = append(warnings, fmt.Sprintf("Failed to list KNative Services: %v", err))
+			} else {
+				trafficKnativeServices = ksvcs
+			}
+		}
+	}
+
 	// Step 1: Find services referenced by ingresses
 	for _, ing := range ingresses {
 		if !opts.MatchesNamespaceFilter(ing.Namespace) {
@@ -3152,6 +3730,35 @@ func (b *Builder) buildTrafficTopology(opts BuildOptions) (*Topology, error) {
 		}
 	}
 
+	// Step 1d: Find services referenced by KNative Services
+	// KNative creates per-revision private services ({revisionName}-private) that actually
+	// select pods. The same-name service ({ksvcName}) is ExternalName and has no pod selector.
+	servicesFromKnative := make(map[string]bool)
+	for _, ksvc := range trafficKnativeServices {
+		ns := ksvc.GetNamespace()
+		if !opts.MatchesNamespaceFilter(ns) {
+			continue
+		}
+		trafficTargets, _, _ := unstructured.NestedSlice(ksvc.Object, "status", "traffic")
+		for _, tt := range trafficTargets {
+			ttMap, ok := tt.(map[string]any)
+			if !ok {
+				continue
+			}
+			revName, _, _ := unstructured.NestedString(ttMap, "revisionName")
+			if revName != "" {
+				servicesFromKnative[ns+"/"+revName+"-private"] = true
+			}
+		}
+		// Fallback: if no traffic targets, use latestReadyRevisionName
+		if len(trafficTargets) == 0 {
+			latestRev, _, _ := unstructured.NestedString(ksvc.Object, "status", "latestReadyRevisionName")
+			if latestRev != "" {
+				servicesFromKnative[ns+"/"+latestRev+"-private"] = true
+			}
+		}
+	}
+
 	// Step 2: Find all services and check which have pods
 	for _, svc := range services {
 		if !opts.MatchesNamespaceFilter(svc.Namespace) {
@@ -3168,8 +3775,8 @@ func (b *Builder) buildTrafficTopology(opts BuildOptions) (*Topology, error) {
 			}
 		}
 
-		// Include service if: referenced by ingress, gateway route, istio VS, OR has matching pods
-		if servicesFromIngress[svcKey] || servicesFromGateway[svcKey] || servicesFromIstio[svcKey] || hasPods {
+		// Include service if: referenced by ingress, gateway route, istio VS, knative, OR has matching pods
+		if servicesFromIngress[svcKey] || servicesFromGateway[svcKey] || servicesFromIstio[svcKey] || servicesFromKnative[svcKey] || hasPods {
 			servicesToInclude[svcKey] = svc
 		}
 	}
@@ -3495,8 +4102,95 @@ func (b *Builder) buildTrafficTopology(opts BuildOptions) (*Topology, error) {
 		}
 	}
 
-	// Step 4: Add Internet node if we have ingresses, gateways, or Istio gateways
-	if len(ingressIDs) > 0 || len(trafficGatewayIDs) > 0 || len(trafficIstioGatewayIDs) > 0 {
+	// Step 3d: Build KNative Serving nodes/edges for traffic view
+	// KNative traffic flow: Internet → KnativeService → K8s Service → Pods
+	// KnativeRoute shown as subtitle data on KnativeService (URL comes from Route)
+	trafficKnativeServiceIDs := make([]string, 0)
+	for _, ksvc := range trafficKnativeServices {
+		ns := ksvc.GetNamespace()
+		if !opts.MatchesNamespaceFilter(ns) {
+			continue
+		}
+		name := ksvc.GetName()
+		ksvcID := fmt.Sprintf("knativeservice/%s/%s", ns, name)
+		trafficKnativeServiceIDs = append(trafficKnativeServiceIDs, ksvcID)
+
+		// Get URL from status (set by KNative Route)
+		url, _, _ := unstructured.NestedString(ksvc.Object, "status", "url")
+		latestRevision, _, _ := unstructured.NestedString(ksvc.Object, "status", "latestReadyRevisionName")
+
+		// Get traffic splits from status
+		trafficTargets, _, _ := unstructured.NestedSlice(ksvc.Object, "status", "traffic")
+		var trafficSummary string
+		for _, tt := range trafficTargets {
+			ttMap, ok := tt.(map[string]any)
+			if !ok {
+				continue
+			}
+			percent, _, _ := unstructured.NestedInt64(ttMap, "percent")
+			revName, _, _ := unstructured.NestedString(ttMap, "revisionName")
+			if trafficSummary != "" {
+				trafficSummary += ", "
+			}
+			if revName != "" {
+				trafficSummary += fmt.Sprintf("%d%% → %s", percent, revName)
+			}
+		}
+
+		nodes = append(nodes, Node{
+			ID:     ksvcID,
+			Kind:   KindKnativeService,
+			Name:   name,
+			Status: extractGenericStatus(ksvc),
+			Data: map[string]any{
+				"namespace":       ns,
+				"url":             url,
+				"latestRevision":  latestRevision,
+				"trafficSummary":  trafficSummary,
+				"labels":          ksvc.GetLabels(),
+			},
+		})
+
+		// KnativeService → revision private services (the ones that actually select pods)
+		for _, tt := range trafficTargets {
+			ttMap, ok := tt.(map[string]any)
+			if !ok {
+				continue
+			}
+			revName, _, _ := unstructured.NestedString(ttMap, "revisionName")
+			if revName == "" {
+				continue
+			}
+			privateSvcKey := ns + "/" + revName + "-private"
+			if _, ok := servicesToInclude[privateSvcKey]; ok {
+				svcID := fmt.Sprintf("service/%s/%s", ns, revName+"-private")
+				serviceIDs[privateSvcKey] = svcID
+				edges = append(edges, Edge{
+					ID:     fmt.Sprintf("%s-to-%s", ksvcID, svcID),
+					Source: ksvcID,
+					Target: svcID,
+					Type:   EdgeExposes,
+				})
+			}
+		}
+		// Fallback for no traffic targets
+		if len(trafficTargets) == 0 && latestRevision != "" {
+			privateSvcKey := ns + "/" + latestRevision + "-private"
+			if _, ok := servicesToInclude[privateSvcKey]; ok {
+				svcID := fmt.Sprintf("service/%s/%s", ns, latestRevision+"-private")
+				serviceIDs[privateSvcKey] = svcID
+				edges = append(edges, Edge{
+					ID:     fmt.Sprintf("%s-to-%s", ksvcID, svcID),
+					Source: ksvcID,
+					Target: svcID,
+					Type:   EdgeExposes,
+				})
+			}
+		}
+	}
+
+	// Step 4: Add Internet node if we have ingresses, gateways, Istio gateways, or KNative services with URLs
+	if len(ingressIDs) > 0 || len(trafficGatewayIDs) > 0 || len(trafficIstioGatewayIDs) > 0 || len(trafficKnativeServiceIDs) > 0 {
 		nodes = append([]Node{{
 			ID:     "internet",
 			Kind:   KindInternet,
@@ -3526,6 +4220,14 @@ func (b *Builder) buildTrafficTopology(opts BuildOptions) (*Topology, error) {
 				ID:     fmt.Sprintf("internet-to-%s", igwID),
 				Source: "internet",
 				Target: igwID,
+				Type:   EdgeRoutesTo,
+			})
+		}
+		for _, ksvcID := range trafficKnativeServiceIDs {
+			edges = append(edges, Edge{
+				ID:     fmt.Sprintf("internet-to-%s", ksvcID),
+				Source: "internet",
+				Target: ksvcID,
 				Type:   EdgeRoutesTo,
 			})
 		}
@@ -3839,6 +4541,31 @@ func parseIstioHost(host, defaultNs string) (string, string) {
 	return parts[0], parts[1]
 }
 
+// resolveKnativeRef resolves a KNative object reference (kind/ns/name) to a topology node ID.
+// It checks K8s Services, KNative Services, Brokers, and Channels — the most common sink/subscriber targets.
+func resolveKnativeRef(kind, ns, name string, serviceIDs, knativeServiceIDs, brokerIDs, channelIDs map[string]string) string {
+	key := ns + "/" + name
+	switch kind {
+	case "Service":
+		// Could be a K8s Service or a KNative Service — check KNative first (more specific)
+		if id, ok := knativeServiceIDs[key]; ok {
+			return id
+		}
+		if id, ok := serviceIDs[key]; ok {
+			return id
+		}
+	case "Broker":
+		if id, ok := brokerIDs[key]; ok {
+			return id
+		}
+	case "Channel", "InMemoryChannel":
+		if id, ok := channelIDs[key]; ok {
+			return id
+		}
+	}
+	return ""
+}
+
 type workloadRefs struct {
 	configMaps map[string]bool
 	secrets    map[string]bool
@@ -4115,6 +4842,8 @@ func extractGenericStatus(resource *unstructured.Unstructured) HealthStatus {
 						return StatusHealthy
 					case "False":
 						return StatusUnhealthy
+					case "Unknown":
+						return StatusDegraded
 					}
 				}
 			}
@@ -4377,6 +5106,12 @@ func (b *Builder) addGenericCRDNodes(nodes []Node, edges []Edge, opts BuildOptio
 		"gatewayclass": true,                       // Gateway API
 		"virtualservice": true, "destinationrule": true, "serviceentry": true, // Istio networking
 		"peerauthentication": true, "authorizationpolicy": true,               // Istio security
+		"knativeservice": true, "configuration": true, "revision": true, "route": true, // KNative Serving
+		"domainmapping": true, "serverlessservice": true,                                // KNative Serving (internal)
+		"broker": true, "trigger": true, "eventtype": true,                              // KNative Eventing
+		"channel": true, "inmemorychannel": true, "subscription": true,                  // KNative Messaging
+		"apiserversource": true, "containersource": true, "pingsource": true, "sinkbinding": true, // KNative Sources
+		"sequence": true, "parallel": true,                                              // KNative Flows
 		// Trivy Operator reports - high cardinality, excluded from topology
 		"vulnerabilityreport": true, "configauditreport": true,
 		"exposedsecretreport": true, "sbomreport": true,

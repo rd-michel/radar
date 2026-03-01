@@ -94,6 +94,23 @@ import {
   getAuthorizationPolicyStatus,
 } from './resource-utils-istio'
 import { getCNPGClusterStatus, getCNPGBackupStatus, getCNPGScheduledBackupStatus, getCNPGPoolerStatus } from './resource-utils-cnpg'
+import {
+  getKnativeServiceStatus,
+  getRevisionStatus as getKnativeRevisionStatus,
+  getRouteStatus as getKnativeRouteStatus,
+  getConfigurationStatus as getKnativeConfigurationStatus,
+  getKnativeIngressStatus,
+  getKnativeCertificateStatus,
+  getServerlessServiceStatus,
+  getBrokerStatus,
+  getTriggerStatus,
+  getSourceStatus as getKnativeSourceStatus,
+  getChannelStatus,
+  getSubscriptionStatus,
+  getSequenceStatus,
+  getParallelStatus,
+  getDomainMappingStatus,
+} from './resource-utils-knative'
 import { getExternalSecretStatus, getClusterExternalSecretStatus, getSecretStoreStatus, getClusterSecretStoreStatus } from './resource-utils-eso'
 import {
   PodRenderer,
@@ -179,6 +196,26 @@ import {
   PriorityClassRenderer,
   RuntimeClassRenderer,
   LeaseRenderer,
+  KnativeServiceRenderer,
+  KnativeRevisionRenderer,
+  KnativeRouteRenderer,
+  KnativeConfigurationRenderer,
+  KnativeIngressRenderer,
+  KnativeCertificateRenderer,
+  ServerlessServiceRenderer,
+  BrokerRenderer,
+  TriggerRenderer,
+  EventTypeRenderer,
+  ChannelRenderer,
+  InMemoryChannelRenderer,
+  SubscriptionRenderer,
+  PingSourceRenderer,
+  ApiServerSourceRenderer,
+  ContainerSourceRenderer,
+  SinkBindingRenderer,
+  SequenceRenderer,
+  ParallelRenderer,
+  DomainMappingRenderer,
 } from './renderers'
 import { useOpenTerminal, useOpenLogs, useOpenWorkloadLogs } from '../dock'
 import { PortForwardButton } from '../portforward/PortForwardButton'
@@ -720,8 +757,8 @@ function ActionsBar({ resource, data, onClose }: ActionsBarProps) {
         </>
       )}
 
-      {/* Service actions */}
-      {kind === 'services' && canPortForward && resource.namespace && resource.name && (
+      {/* Service actions (exclude KNative Services which don't have ClusterIP ports) */}
+      {kind === 'services' && !data?.apiVersion?.includes('serving.knative.dev') && canPortForward && resource.namespace && resource.name && (
         <PortForwardButton
           type="service"
           namespace={resource.namespace}
@@ -1693,6 +1730,10 @@ function ResourceContent({ resource, data, relationships, certificateInfo, onCop
     'peerauthentications', 'authorizationpolicies',
     'mutatingwebhookconfigurations', 'validatingwebhookconfigurations',
     'ingressclasses', 'priorityclasses', 'runtimeclasses', 'leases',
+    'knativeservices', 'knativeconfigurations', 'knativerevisions', 'knativeroutes',
+    'brokers', 'triggers', 'eventtypes', 'pingsources', 'apiserversources', 'containersources', 'sinkbindings',
+    'channels', 'inmemorychannels', 'subscriptions', 'sequences', 'parallels',
+    'knativeingresses', 'knativecertificates', 'serverlessservices', 'domainmappings',
   ]
   const isKnownKind = knownKinds.includes(kind)
 
@@ -1702,8 +1743,8 @@ function ResourceContent({ resource, data, relationships, certificateInfo, onCop
       {kind === 'pods' && <PodRenderer data={data} onCopy={onCopy} copied={copied} onNavigate={onNavigate} />}
       {['deployments', 'statefulsets', 'daemonsets'].includes(kind) && <WorkloadRenderer kind={kind} data={data} onNavigate={onNavigate} />}
       {kind === 'replicasets' && <ReplicaSetRenderer data={data} />}
-      {kind === 'services' && <ServiceRenderer data={data} onCopy={onCopy} copied={copied} />}
-      {kind === 'ingresses' && <IngressRenderer data={data} onNavigate={onNavigate} />}
+      {kind === 'services' && !data?.apiVersion?.includes('serving.knative.dev') && <ServiceRenderer data={data} onCopy={onCopy} copied={copied} />}
+      {kind === 'ingresses' && !data?.apiVersion?.includes('networking.internal.knative.dev') && <IngressRenderer data={data} onNavigate={onNavigate} />}
       {kind === 'configmaps' && <ConfigMapRenderer data={data} />}
       {kind === 'secrets' && <SecretRenderer data={data} certificateInfo={certificateInfo} resourceData={data} onSaveSecretValue={onSaveSecretValue} isSaving={isSavingSecret} />}
       {kind === 'jobs' && <JobRenderer data={data} />}
@@ -1712,7 +1753,7 @@ function ResourceContent({ resource, data, relationships, certificateInfo, onCop
       {kind === 'nodes' && <NodeRenderer data={data} relationships={relationships} />}
       {kind === 'persistentvolumeclaims' && <PVCRenderer data={data} onNavigate={onNavigate} />}
       {kind === 'rollouts' && <RolloutRenderer data={data} />}
-      {kind === 'certificates' && <CertificateRenderer data={data} />}
+      {kind === 'certificates' && !data?.apiVersion?.includes('networking.internal.knative.dev') && <CertificateRenderer data={data} />}
       {kind === 'workflows' && <WorkflowRenderer data={data} />}
       {kind === 'persistentvolumes' && <PersistentVolumeRenderer data={data} onNavigate={onNavigate} />}
       {kind === 'storageclasses' && <StorageClassRenderer data={data} />}
@@ -1783,6 +1824,29 @@ function ResourceContent({ resource, data, relationships, certificateInfo, onCop
       {kind === 'priorityclasses' && <PriorityClassRenderer data={data} />}
       {kind === 'runtimeclasses' && <RuntimeClassRenderer data={data} />}
       {kind === 'leases' && <LeaseRenderer data={data} />}
+      {(kind === 'services' && data?.apiVersion?.includes('serving.knative.dev')) && <KnativeServiceRenderer data={data} onNavigate={onNavigate} />}
+      {kind === 'knativeservices' && <KnativeServiceRenderer data={data} onNavigate={onNavigate} />}
+      {kind === 'knativeconfigurations' && <KnativeConfigurationRenderer data={data} onNavigate={onNavigate} />}
+      {kind === 'knativerevisions' && <KnativeRevisionRenderer data={data} onNavigate={onNavigate} />}
+      {kind === 'knativeroutes' && <KnativeRouteRenderer data={data} onNavigate={onNavigate} />}
+      {kind === 'brokers' && <BrokerRenderer data={data} onNavigate={onNavigate} />}
+      {kind === 'triggers' && <TriggerRenderer data={data} onNavigate={onNavigate} />}
+      {kind === 'pingsources' && <PingSourceRenderer data={data} onNavigate={onNavigate} />}
+      {kind === 'apiserversources' && <ApiServerSourceRenderer data={data} onNavigate={onNavigate} />}
+      {kind === 'containersources' && <ContainerSourceRenderer data={data} onNavigate={onNavigate} />}
+      {kind === 'sinkbindings' && <SinkBindingRenderer data={data} onNavigate={onNavigate} />}
+      {kind === 'eventtypes' && <EventTypeRenderer data={data} />}
+      {kind === 'channels' && <ChannelRenderer data={data} onNavigate={onNavigate} />}
+      {kind === 'inmemorychannels' && <InMemoryChannelRenderer data={data} onNavigate={onNavigate} />}
+      {kind === 'subscriptions' && <SubscriptionRenderer data={data} onNavigate={onNavigate} />}
+      {kind === 'sequences' && <SequenceRenderer data={data} onNavigate={onNavigate} />}
+      {kind === 'parallels' && <ParallelRenderer data={data} onNavigate={onNavigate} />}
+      {(kind === 'ingresses' && data?.apiVersion?.includes('networking.internal.knative.dev')) && <KnativeIngressRenderer data={data} />}
+      {kind === 'knativeingresses' && <KnativeIngressRenderer data={data} />}
+      {(kind === 'certificates' && data?.apiVersion?.includes('networking.internal.knative.dev')) && <KnativeCertificateRenderer data={data} />}
+      {kind === 'knativecertificates' && <KnativeCertificateRenderer data={data} />}
+      {kind === 'serverlessservices' && <ServerlessServiceRenderer data={data} onNavigate={onNavigate} />}
+      {kind === 'domainmappings' && <DomainMappingRenderer data={data} onNavigate={onNavigate} />}
 
       {/* Generic renderer for CRDs and unknown resource types */}
       {!isKnownKind && <GenericRenderer data={data} />}
@@ -1830,6 +1894,11 @@ function getResourceStatus(kind: string, data: any): { text: string; color: stri
   }
 
   if (k === 'services') {
+    // KNative Service uses its own status function
+    if (data.apiVersion?.includes('serving.knative.dev')) {
+      const status = getKnativeServiceStatus(data)
+      return { text: status.text, color: status.color }
+    }
     const status = getServiceStatus(data)
     return { text: status.text, color: status.color }
   }
@@ -1870,6 +1939,11 @@ function getResourceStatus(kind: string, data: any): { text: string; color: stri
   }
 
   if (k === 'certificates') {
+    // KNative Certificate uses its own status function
+    if (data.apiVersion?.includes('networking.internal.knative.dev')) {
+      const status = getKnativeCertificateStatus(data)
+      return { text: status.text, color: status.color }
+    }
     const status = getCertificateStatus(data)
     return { text: status.text, color: status.color }
   }
@@ -2130,6 +2204,93 @@ function getResourceStatus(kind: string, data: any): { text: string; color: stri
 
   if (k === 'authorizationpolicies') {
     const status = getAuthorizationPolicyStatus(data)
+    return { text: status.text, color: status.color }
+  }
+
+  // Knative Serving
+  if (k === 'knativeservices' || (k === 'services' && data.apiVersion?.includes('serving.knative.dev'))) {
+    const status = getKnativeServiceStatus(data)
+    return { text: status.text, color: status.color }
+  }
+
+  if (k === 'knativeconfigurations') {
+    const status = getKnativeConfigurationStatus(data)
+    return { text: status.text, color: status.color }
+  }
+
+  if (k === 'knativerevisions') {
+    const status = getKnativeRevisionStatus(data)
+    return { text: status.text, color: status.color }
+  }
+
+  if (k === 'knativeroutes') {
+    const status = getKnativeRouteStatus(data)
+    return { text: status.text, color: status.color }
+  }
+
+  // Knative Eventing
+  if (k === 'brokers') {
+    const status = getBrokerStatus(data)
+    return { text: status.text, color: status.color }
+  }
+
+  if (k === 'triggers') {
+    const status = getTriggerStatus(data)
+    return { text: status.text, color: status.color }
+  }
+
+  // Knative Sources
+  if (k === 'pingsources' || k === 'apiserversources' || k === 'containersources' || k === 'sinkbindings') {
+    const status = getKnativeSourceStatus(data)
+    return { text: status.text, color: status.color }
+  }
+
+  // Knative Eventing/Messaging
+  if (k === 'channels' || k === 'inmemorychannels') {
+    const status = getChannelStatus(data)
+    return { text: status.text, color: status.color }
+  }
+
+  if (k === 'subscriptions') {
+    const status = getSubscriptionStatus(data)
+    return { text: status.text, color: status.color }
+  }
+
+  // Knative Flows
+  if (k === 'sequences') {
+    const status = getSequenceStatus(data)
+    return { text: status.text, color: status.color }
+  }
+
+  if (k === 'parallels') {
+    const status = getParallelStatus(data)
+    return { text: status.text, color: status.color }
+  }
+
+  // Knative Serving
+  if (k === 'domainmappings') {
+    const status = getDomainMappingStatus(data)
+    return { text: status.text, color: status.color }
+  }
+
+  // Knative Networking
+  if (k === 'ingresses' && data.apiVersion?.includes('networking.internal.knative.dev')) {
+    const status = getKnativeIngressStatus(data)
+    return { text: status.text, color: status.color }
+  }
+
+  if (k === 'knativeingresses') {
+    const status = getKnativeIngressStatus(data)
+    return { text: status.text, color: status.color }
+  }
+
+  if ((k === 'certificates' && data.apiVersion?.includes('networking.internal.knative.dev')) || k === 'knativecertificates') {
+    const status = getKnativeCertificateStatus(data)
+    return { text: status.text, color: status.color }
+  }
+
+  if (k === 'serverlessservices') {
+    const status = getServerlessServiceStatus(data)
     return { text: status.text, color: status.color }
   }
 

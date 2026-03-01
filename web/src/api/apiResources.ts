@@ -85,16 +85,19 @@ export function categorizeResources(resources: APIResource[]): ResourceCategory[
   // Deduplicate by kind (not plural name) to handle cases like:
   // - Pod (core/v1, name: pods) vs PodMetrics (metrics.k8s.io, name: pods)
   // - HorizontalPodAutoscaler (autoscaling/v1 and autoscaling/v2)
+  // CRDs use group/kind as key to preserve resources with colliding kind names
+  // (e.g., KNative Service vs core Service, KNative Ingress vs core Ingress)
   const seenKinds = new Map<string, APIResource>()
+  const dedupKey = (r: APIResource) => r.isCrd ? `${r.group}/${r.kind}` : r.kind
 
   // Add core resources first as fallback
   for (const resource of CORE_RESOURCES) {
-    seenKinds.set(resource.kind, resource)
+    seenKinds.set(dedupKey(resource), resource)
   }
 
   // Add discovered resources (will override fallbacks with real data)
   for (const resource of listableResources) {
-    seenKinds.set(resource.kind, resource)
+    seenKinds.set(dedupKey(resource), resource)
   }
   const uniqueResources = Array.from(seenKinds.values())
 
@@ -107,12 +110,15 @@ export function categorizeResources(resources: APIResource[]): ResourceCategory[
     categoryMap.set(name, [...existing, ...items])
   }
 
-  const workloads = uniqueResources.filter(r => WORKLOAD_KINDS.includes(r.kind))
-  const networking = uniqueResources.filter(r => NETWORKING_KINDS.includes(r.kind))
-  const config = uniqueResources.filter(r => CONFIG_KINDS.includes(r.kind))
-  const storage = uniqueResources.filter(r => STORAGE_KINDS.includes(r.kind))
-  const accessControl = uniqueResources.filter(r => ACCESS_CONTROL_KINDS.includes(r.kind))
-  const cluster = uniqueResources.filter(r => CLUSTER_KINDS.includes(r.kind))
+  // Exclude CRDs from core categories — CRDs with colliding kind names (e.g., KNative Service
+  // vs core Service) must only appear in their API group category, not in core categories.
+  const coreResources = uniqueResources.filter(r => !r.isCrd)
+  const workloads = coreResources.filter(r => WORKLOAD_KINDS.includes(r.kind))
+  const networking = coreResources.filter(r => NETWORKING_KINDS.includes(r.kind))
+  const config = coreResources.filter(r => CONFIG_KINDS.includes(r.kind))
+  const storage = coreResources.filter(r => STORAGE_KINDS.includes(r.kind))
+  const accessControl = coreResources.filter(r => ACCESS_CONTROL_KINDS.includes(r.kind))
+  const cluster = coreResources.filter(r => CLUSTER_KINDS.includes(r.kind))
 
   // CRDs grouped by API group
   const crds = uniqueResources.filter(r => r.isCrd)
@@ -174,6 +180,8 @@ export function formatGroupName(group: string): string {
     'eventing.knative.dev': 'Knative',
     'messaging.knative.dev': 'Knative',
     'sources.knative.dev': 'Knative',
+    'networking.internal.knative.dev': 'Knative',
+    'flows.knative.dev': 'Knative',
     'kafka.strimzi.io': 'Strimzi',
     'tekton.dev': 'Tekton',
     'linkerd.io': 'Linkerd',

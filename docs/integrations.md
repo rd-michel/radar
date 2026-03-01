@@ -550,6 +550,109 @@ See the main [README](../README.md#gitops) for GitOps integration details.
 
 ---
 
+## Knative
+
+[Knative](https://knative.dev/) extends Kubernetes with serverless capabilities: scale-to-zero, request-driven autoscaling, event-driven architectures, and simplified service deployment.
+
+### What Radar Shows
+
+**Topology:** Full Knative Serving chain — Route → KnativeService → Configuration → Revision → Deployment → Pod. Eventing flow — PingSource → Broker → Trigger → subscriber target. See how traffic is split across revisions, which configurations are active, and how events flow from sources through brokers to triggers.
+
+<p align="center">
+  <img src="screenshots/integrations/knative-topology.png" alt="Knative Topology" width="800">
+  <br><em>Knative in Topology View — Serving chain and Eventing flow</em>
+</p>
+
+**KnativeService Detail View:**
+- Status with URL and ingress readiness
+- Latest ready and latest created revision links
+- Scaling configuration (min/max scale, concurrency, timeout)
+- Traffic split across revisions with percentage bars
+- Container template (image, ports, env, resources)
+- Conditions (Ready, RoutesReady, ConfigurationsReady)
+
+<p align="center">
+  <img src="screenshots/integrations/knative-service-detail.png" alt="Knative Service Detail" width="800">
+  <br><em>KnativeService Detail View — URL, scaling, traffic splits, and conditions</em>
+</p>
+
+**Revision Detail View:**
+- Container image with tag
+- Concurrency model and container concurrency limit
+- Timeout and scaling bounds (min/max)
+- Traffic percentage (active vs inactive)
+- Conditions (Ready, ContainerHealthy, ResourcesAvailable, Active)
+
+**Route Detail View:**
+- URL and domain
+- Traffic targets with revision names and percentage distribution
+- Conditions (Ready, AllTrafficAssigned, IngressReady)
+
+**Configuration Detail View:**
+- Latest created and latest ready revision references
+- Generation tracking
+- Conditions (Ready)
+
+**Broker Detail View:**
+- Address (internal URL for event delivery)
+- Delivery configuration (dead letter sink, retry, backoff)
+- Conditions (Ready, Addressable, FilterReady, IngressReady, TriggerChannelReady)
+
+**Trigger Detail View:**
+- Broker reference
+- Subscriber target (service, URI, or Kubernetes reference)
+- Event filter attributes
+- Delivery configuration (dead letter sink)
+- Conditions (Ready, BrokerReady, SubscriberResolved, DependencyReady)
+
+**Source Detail Views (PingSource, ApiServerSource, ContainerSource, SinkBinding):**
+- Sink target reference
+- Source-specific configuration:
+  - PingSource: cron schedule, data payload, content type
+  - ApiServerSource: API resources watched, event mode, service account
+  - ContainerSource: container image and arguments
+  - SinkBinding: subject reference (Deployment, Job, etc.)
+- Conditions (Ready, Deployed, SinkProvided)
+
+**Networking Detail Views (Ingress, Certificate, ServerlessService):**
+- KnativeIngress: ingress class, visibility, TLS hosts, rules with path/host routing
+- KnativeCertificate: domain names, DNS names, not-after expiry
+- ServerlessService: mode (Proxy/Serve), network status
+
+**Flow Detail Views (Sequence, Parallel):**
+- Sequence: ordered list of steps with subscriber references
+- Parallel: branches with filter and subscriber configurations
+- Reply/channel template settings
+
+**Resource Browser:** Smart columns show status, URLs, latest revisions, traffic splits, schedules, sinks, brokers, subscribers, and filters at a glance.
+
+### Supported CRDs
+
+| CRD | Group | Topology | Detail View | AI Summary |
+|-----|-------|----------|-------------|------------|
+| Service | `serving.knative.dev/v1` | Yes | Yes | — |
+| Configuration | `serving.knative.dev/v1` | Yes | Yes | — |
+| Revision | `serving.knative.dev/v1` | Yes | Yes | — |
+| Route | `serving.knative.dev/v1` | Yes | Yes | — |
+| DomainMapping | `serving.knative.dev/v1beta1` | — | Yes | — |
+| Broker | `eventing.knative.dev/v1` | Yes | Yes | — |
+| Trigger | `eventing.knative.dev/v1` | Yes | Yes | — |
+| EventType | `eventing.knative.dev/v1beta2` | — | Yes | — |
+| Channel | `messaging.knative.dev/v1` | — | Yes | — |
+| InMemoryChannel | `messaging.knative.dev/v1` | — | Yes | — |
+| Subscription | `messaging.knative.dev/v1` | — | Yes | — |
+| PingSource | `sources.knative.dev/v1` | Yes | Yes | — |
+| ApiServerSource | `sources.knative.dev/v1` | Yes | Yes | — |
+| ContainerSource | `sources.knative.dev/v1` | Yes | Yes | — |
+| SinkBinding | `sources.knative.dev/v1` | Yes | Yes | — |
+| Sequence | `flows.knative.dev/v1` | — | Yes | — |
+| Parallel | `flows.knative.dev/v1` | — | Yes | — |
+| Ingress | `networking.internal.knative.dev/v1alpha1` | — | Yes | — |
+| Certificate | `networking.internal.knative.dev/v1alpha1` | — | Yes | — |
+| ServerlessService | `networking.internal.knative.dev/v1alpha1` | — | Yes | — |
+
+---
+
 ## Any Other CRD
 
 Radar automatically discovers and displays **every** CRD installed in your cluster — no configuration or plugins required. Resources appear in the sidebar, can be filtered and searched, and show full YAML with syntax highlighting in the detail drawer. The integrations above add richer presentation, but every CRD is browsable out of the box.

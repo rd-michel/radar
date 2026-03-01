@@ -113,6 +113,17 @@ export const NODE_DIMENSIONS: Record<NodeKind, { width: number; height: number }
   NodePool: { width: 260, height: 56 },
   NodeClaim: { width: 260, height: 56 },
   NodeClass: { width: 260, height: 56 },
+  KnativeService: { width: 280, height: 56 },
+  KnativeConfiguration: { width: 280, height: 56 },
+  KnativeRevision: { width: 280, height: 56 },
+  KnativeRoute: { width: 280, height: 56 },
+  Broker: { width: 280, height: 56 },
+  Channel: { width: 280, height: 56 },
+  Trigger: { width: 280, height: 56 },
+  PingSource: { width: 280, height: 56 },
+  ApiServerSource: { width: 280, height: 56 },
+  ContainerSource: { width: 280, height: 56 },
+  SinkBinding: { width: 280, height: 56 },
 }
 
 
@@ -229,6 +240,18 @@ function getSubtitle(kind: NodeKind, nodeData: Record<string, unknown>): string 
         return `${count} pods (${unhealthy} unhealthy)`
       }
       return `${count} pods (${healthy} healthy)`
+    }
+    case 'KnativeService': {
+      const url = nodeData.url as string
+      if (url) {
+        // Show just the hostname from the URL for compactness
+        try {
+          return new URL(url).hostname
+        } catch {
+          return url
+        }
+      }
+      return (nodeData.latestRevision as string) || ''
     }
     case 'Node': {
       const instanceType = nodeData.instanceType as string

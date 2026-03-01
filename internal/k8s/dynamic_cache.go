@@ -914,6 +914,19 @@ func WarmupCommonCRDs() {
 		"PodMonitor",                   // Prometheus Operator
 		"PrometheusRule",               // Prometheus Operator
 		"Alertmanager",                 // Prometheus Operator
+		"Revision",                     // KNative Serving
+		"DomainMapping",                // KNative Serving
+		"ServerlessService",            // KNative Serving (internal)
+		"Trigger",                      // KNative Eventing
+		"EventType",                    // KNative Eventing
+		"InMemoryChannel",              // KNative Messaging
+		"Subscription",                 // KNative Messaging
+		"ApiServerSource",              // KNative Sources
+		"ContainerSource",              // KNative Sources
+		"PingSource",                   // KNative Sources
+		"SinkBinding",                  // KNative Sources
+		"Sequence",                     // KNative Flows
+		"Parallel",                     // KNative Flows
 	}
 
 	var gvrs []schema.GroupVersionResource
@@ -929,6 +942,36 @@ func WarmupCommonCRDs() {
 	if gvr, ok := discovery.GetGVRWithGroup("Application", "argoproj.io"); ok {
 		gvrs = append(gvrs, gvr)
 		log.Printf("Warming up CRD: Application (argoproj.io)")
+	}
+
+	// KNative kinds that collide with core/other CRDs need group-qualified lookup
+	if gvr, ok := discovery.GetGVRWithGroup("Service", "serving.knative.dev"); ok {
+		gvrs = append(gvrs, gvr)
+		log.Printf("Warming up CRD: Service (serving.knative.dev)")
+	}
+	if gvr, ok := discovery.GetGVRWithGroup("Ingress", "networking.internal.knative.dev"); ok {
+		gvrs = append(gvrs, gvr)
+		log.Printf("Warming up CRD: Ingress (networking.internal.knative.dev)")
+	}
+	if gvr, ok := discovery.GetGVRWithGroup("Certificate", "networking.internal.knative.dev"); ok {
+		gvrs = append(gvrs, gvr)
+		log.Printf("Warming up CRD: Certificate (networking.internal.knative.dev)")
+	}
+	if gvr, ok := discovery.GetGVRWithGroup("Channel", "messaging.knative.dev"); ok {
+		gvrs = append(gvrs, gvr)
+		log.Printf("Warming up CRD: Channel (messaging.knative.dev)")
+	}
+	if gvr, ok := discovery.GetGVRWithGroup("Configuration", "serving.knative.dev"); ok {
+		gvrs = append(gvrs, gvr)
+		log.Printf("Warming up CRD: Configuration (serving.knative.dev)")
+	}
+	if gvr, ok := discovery.GetGVRWithGroup("Route", "serving.knative.dev"); ok {
+		gvrs = append(gvrs, gvr)
+		log.Printf("Warming up CRD: Route (serving.knative.dev)")
+	}
+	if gvr, ok := discovery.GetGVRWithGroup("Broker", "eventing.knative.dev"); ok {
+		gvrs = append(gvrs, gvr)
+		log.Printf("Warming up CRD: Broker (eventing.knative.dev)")
 	}
 
 	if len(gvrs) > 0 {

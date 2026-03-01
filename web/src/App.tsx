@@ -45,7 +45,9 @@ const ALL_NODE_KINDS: NodeKind[] = [
   'Internet', 'Ingress', 'Gateway', 'HTTPRoute', 'GRPCRoute', 'TCPRoute', 'TLSRoute',
   'Service', 'Deployment', 'Rollout', 'DaemonSet', 'StatefulSet',
   'ReplicaSet', 'Pod', 'PodGroup', 'ConfigMap', 'Secret', 'HorizontalPodAutoscaler', 'Job', 'CronJob', 'PersistentVolumeClaim', 'Namespace',
-  'Application', 'Kustomization', 'HelmRelease', 'GitRepository'
+  'Application', 'Kustomization', 'HelmRelease', 'GitRepository',
+  'KnativeService', 'KnativeConfiguration', 'KnativeRevision', 'KnativeRoute',
+  'Broker', 'Trigger', 'PingSource', 'ApiServerSource', 'ContainerSource', 'SinkBinding', 'Channel',
 ]
 
 // Default visible kinds (ReplicaSet hidden by default - noisy intermediate object)

@@ -311,6 +311,23 @@ body {
 .topology-icon-kustomization { background: #0ea5e9; }
 .topology-icon-helmrelease { background: #0ea5e9; }
 .topology-icon-gitrepository { background: #14b8a6; }
+.topology-icon-knativeservice { background: #d946ef; }
+.topology-icon-knativeconfiguration { background: #c026d3; }
+.topology-icon-knativerevision { background: #a855f7; }
+.topology-icon-knativeroute { background: #d946ef; }
+.topology-icon-broker { background: #c026d3; }
+.topology-icon-trigger { background: #a855f7; }
+.topology-icon-pingsource { background: #d946ef; }
+.topology-icon-apiserversource { background: #c026d3; }
+.topology-icon-containersource { background: #a855f7; }
+.topology-icon-sinkbinding { background: #d946ef; }
+.topology-icon-channel { background: #c026d3; }
+.topology-icon-inmemorychannel { background: #c026d3; }
+.topology-icon-subscription { background: #a855f7; }
+.topology-icon-sequence { background: #d946ef; }
+.topology-icon-parallel { background: #d946ef; }
+.topology-icon-domainmapping { background: #d946ef; }
+.topology-icon-serverlessservice { background: #a855f7; }
 
 /* Background dots - uses CSS variable for theme awareness */
 .react-flow__background pattern circle {

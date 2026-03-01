@@ -280,6 +280,11 @@ Radar auto-discovers any CRD in your cluster. Popular tools get [dedicated integ
 | **Argo Workflows** | Workflow, WorkflowTemplate |
 | **cert-manager** | Certificate, CertificateRequest, Order, Challenge, Issuer, ClusterIssuer |
 | **Gateway API** | Gateway, GatewayClass, HTTPRoute, GRPCRoute, TCPRoute, TLSRoute |
+| **Knative Serving** | Service, Configuration, Revision, Route, DomainMapping |
+| **Knative Eventing** | Broker, Trigger, EventType, Channel, InMemoryChannel, Subscription |
+| **Knative Sources** | PingSource, ApiServerSource, ContainerSource, SinkBinding |
+| **Knative Flows** | Sequence, Parallel |
+| **Knative Networking** | Ingress, Certificate, ServerlessService |
 | **Karpenter** | NodePool, NodeClaim (+ provider-specific NodeClasses via auto-discovery) |
 | **KEDA** | ScaledObject, ScaledJob, TriggerAuthentication, ClusterTriggerAuthentication |
 | **Prometheus Operator** | ServiceMonitor, PodMonitor, PrometheusRule, Alertmanager |

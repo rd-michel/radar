@@ -47,6 +47,14 @@ import {
   Anchor,
   FolderGit2,
 
+  // Knative
+  Zap,
+  Clock,
+  Container,
+  Link,
+  Route,
+  Settings,
+
   // Fallback
   Puzzle,
 } from 'lucide-react'
@@ -140,6 +148,23 @@ const KIND_ICON_MAP: Record<string, LucideIcon> = {
 
   // PDB
   poddisruptionbudget: ShieldCheck,
+
+  // Knative Serving
+  knativeservice: Layers,
+  knativeconfiguration: Settings,
+  knativerevision: GitBranch,
+  knativeroute: Route,
+
+  // Knative Eventing & Messaging
+  broker: Radio,
+  trigger: Zap,
+  channel: Radio,
+
+  // Knative Sources
+  pingsource: Clock,
+  apiserversource: Server,
+  containersource: Container,
+  sinkbinding: Link,
 
   // Trivy Operator
   vulnerabilityreport: Shield,

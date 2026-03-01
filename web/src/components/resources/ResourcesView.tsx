@@ -136,6 +136,7 @@ import { ExternalSecretCell, ClusterExternalSecretCell, SecretStoreCell, Cluster
 import { BackupCell, RestoreCell, ScheduleCell, BackupStorageLocationCell } from './renderers/velero-cells'
 import { CNPGClusterCell, CNPGBackupCell, CNPGScheduledBackupCell, CNPGPoolerCell } from './renderers/cnpg-cells'
 import { VirtualServiceCell, DestinationRuleCell, IstioGatewayCell, ServiceEntryCell, PeerAuthenticationCell, AuthorizationPolicyCell } from './renderers/istio-cells'
+import { KnativeServiceCell, ConfigurationCell as KnativeConfigurationCell, RevisionCell as KnativeRevisionCell, RouteCell as KnativeRouteCell, BrokerCell, TriggerCell, EventTypeCell, PingSourceCell, ApiServerSourceCell, ContainerSourceCell, SinkBindingCell, ChannelCell, InMemoryChannelCell, SubscriptionCell, SequenceCell, ParallelCell, DomainMappingCell, ServerlessServiceCell, KnativeIngressCell, KnativeCertificateCell } from './renderers/knative-cells'
 import { usePinnedKinds } from '../../hooks/useFavorites'
 import { useRegisterShortcut, useRegisterShortcuts } from '../../hooks/useKeyboardShortcuts'
 import { useOpenLogs, useOpenWorkloadLogs } from '../dock'
@@ -1086,19 +1087,199 @@ const KNOWN_COLUMNS: Record<string, Column[]> = {
     { key: 'selector', label: 'Selector', width: 'w-48' },
     { key: 'age', label: 'Age', width: 'w-20' },
   ],
+  // Knative Serving
+  knativeservices: [
+    { key: 'name', label: 'Name' },
+    { key: 'namespace', label: 'Namespace', width: 'w-36' },
+    { key: 'status', label: 'Status', width: 'w-28' },
+    { key: 'url', label: 'URL', width: 'w-56' },
+    { key: 'latestRevision', label: 'Latest Revision', width: 'w-44' },
+    { key: 'traffic', label: 'Traffic', width: 'w-48' },
+    { key: 'age', label: 'Age', width: 'w-20' },
+  ],
+  knativeconfigurations: [
+    { key: 'name', label: 'Name' },
+    { key: 'namespace', label: 'Namespace', width: 'w-36' },
+    { key: 'status', label: 'Status', width: 'w-28' },
+    { key: 'latestCreated', label: 'Latest Created', width: 'w-48' },
+    { key: 'latestReady', label: 'Latest Ready', width: 'w-48' },
+    { key: 'age', label: 'Age', width: 'w-20' },
+  ],
+  knativerevisions: [
+    { key: 'name', label: 'Name' },
+    { key: 'namespace', label: 'Namespace', width: 'w-36' },
+    { key: 'status', label: 'Status', width: 'w-28' },
+    { key: 'routing', label: 'Traffic', width: 'w-20', tooltip: 'Whether this revision is receiving traffic' },
+    { key: 'image', label: 'Image', width: 'w-48' },
+    { key: 'concurrency', label: 'Concurrency', width: 'w-24' },
+    { key: 'age', label: 'Age', width: 'w-20' },
+  ],
+  knativeroutes: [
+    { key: 'name', label: 'Name' },
+    { key: 'namespace', label: 'Namespace', width: 'w-36' },
+    { key: 'status', label: 'Status', width: 'w-28' },
+    { key: 'url', label: 'URL', width: 'w-56' },
+    { key: 'traffic', label: 'Traffic', width: 'w-48' },
+    { key: 'age', label: 'Age', width: 'w-20' },
+  ],
+  // Knative Eventing
+  brokers: [
+    { key: 'name', label: 'Name' },
+    { key: 'namespace', label: 'Namespace', width: 'w-36' },
+    { key: 'status', label: 'Status', width: 'w-28' },
+    { key: 'address', label: 'Address', width: 'w-56' },
+    { key: 'age', label: 'Age', width: 'w-20' },
+  ],
+  triggers: [
+    { key: 'name', label: 'Name' },
+    { key: 'namespace', label: 'Namespace', width: 'w-36' },
+    { key: 'status', label: 'Status', width: 'w-28' },
+    { key: 'broker', label: 'Broker', width: 'w-36' },
+    { key: 'subscriber', label: 'Subscriber', width: 'w-48' },
+    { key: 'filter', label: 'Filter', width: 'w-48' },
+    { key: 'age', label: 'Age', width: 'w-20' },
+  ],
+  eventtypes: [
+    { key: 'name', label: 'Name' },
+    { key: 'namespace', label: 'Namespace', width: 'w-36' },
+    { key: 'type', label: 'Type', width: 'w-48' },
+    { key: 'source', label: 'Source', width: 'w-44' },
+    { key: 'reference', label: 'Reference', width: 'w-40' },
+    { key: 'age', label: 'Age', width: 'w-20' },
+  ],
+  // Knative Sources
+  pingsources: [
+    { key: 'name', label: 'Name' },
+    { key: 'namespace', label: 'Namespace', width: 'w-36' },
+    { key: 'status', label: 'Status', width: 'w-28' },
+    { key: 'schedule', label: 'Schedule', width: 'w-36' },
+    { key: 'sink', label: 'Sink', width: 'w-48' },
+    { key: 'data', label: 'Data', width: 'w-36' },
+    { key: 'age', label: 'Age', width: 'w-20' },
+  ],
+  apiserversources: [
+    { key: 'name', label: 'Name' },
+    { key: 'namespace', label: 'Namespace', width: 'w-36' },
+    { key: 'status', label: 'Status', width: 'w-28' },
+    { key: 'sink', label: 'Sink', width: 'w-48' },
+    { key: 'age', label: 'Age', width: 'w-20' },
+  ],
+  containersources: [
+    { key: 'name', label: 'Name' },
+    { key: 'namespace', label: 'Namespace', width: 'w-36' },
+    { key: 'status', label: 'Status', width: 'w-28' },
+    { key: 'sink', label: 'Sink', width: 'w-48' },
+    { key: 'age', label: 'Age', width: 'w-20' },
+  ],
+  sinkbindings: [
+    { key: 'name', label: 'Name' },
+    { key: 'namespace', label: 'Namespace', width: 'w-36' },
+    { key: 'status', label: 'Status', width: 'w-28' },
+    { key: 'sink', label: 'Sink', width: 'w-48' },
+    { key: 'subject', label: 'Subject', width: 'w-48' },
+    { key: 'age', label: 'Age', width: 'w-20' },
+  ],
+  // Knative Messaging
+  channels: [
+    { key: 'name', label: 'Name' },
+    { key: 'namespace', label: 'Namespace', width: 'w-36' },
+    { key: 'status', label: 'Status', width: 'w-28' },
+    { key: 'address', label: 'Address', width: 'w-56' },
+    { key: 'age', label: 'Age', width: 'w-20' },
+  ],
+  inmemorychannels: [
+    { key: 'name', label: 'Name' },
+    { key: 'namespace', label: 'Namespace', width: 'w-36' },
+    { key: 'status', label: 'Status', width: 'w-28' },
+    { key: 'address', label: 'Address', width: 'w-56' },
+    { key: 'age', label: 'Age', width: 'w-20' },
+  ],
+  subscriptions: [
+    { key: 'name', label: 'Name' },
+    { key: 'namespace', label: 'Namespace', width: 'w-36' },
+    { key: 'status', label: 'Status', width: 'w-28' },
+    { key: 'channel', label: 'Channel', width: 'w-44' },
+    { key: 'subscriber', label: 'Subscriber', width: 'w-44' },
+    { key: 'age', label: 'Age', width: 'w-20' },
+  ],
+  // Knative Flows
+  sequences: [
+    { key: 'name', label: 'Name' },
+    { key: 'namespace', label: 'Namespace', width: 'w-36' },
+    { key: 'status', label: 'Status', width: 'w-28' },
+    { key: 'steps', label: 'Steps', width: 'w-16' },
+    { key: 'age', label: 'Age', width: 'w-20' },
+  ],
+  parallels: [
+    { key: 'name', label: 'Name' },
+    { key: 'namespace', label: 'Namespace', width: 'w-36' },
+    { key: 'status', label: 'Status', width: 'w-28' },
+    { key: 'branches', label: 'Branches', width: 'w-20' },
+    { key: 'age', label: 'Age', width: 'w-20' },
+  ],
+  // Knative Networking
+  knativeingresses: [
+    { key: 'name', label: 'Name' },
+    { key: 'namespace', label: 'Namespace', width: 'w-36' },
+    { key: 'status', label: 'Status', width: 'w-28' },
+    { key: 'ingressClass', label: 'Class', width: 'w-24' },
+    { key: 'hosts', label: 'Hosts', width: 'w-56' },
+    { key: 'visibility', label: 'Visibility', width: 'w-28' },
+    { key: 'age', label: 'Age', width: 'w-20' },
+  ],
+  knativecertificates: [
+    { key: 'name', label: 'Name' },
+    { key: 'namespace', label: 'Namespace', width: 'w-36' },
+    { key: 'status', label: 'Status', width: 'w-28' },
+    { key: 'dnsNames', label: 'DNS Names', width: 'w-56' },
+    { key: 'secretName', label: 'Secret', width: 'w-44' },
+    { key: 'age', label: 'Age', width: 'w-20' },
+  ],
+  serverlessservices: [
+    { key: 'name', label: 'Name' },
+    { key: 'namespace', label: 'Namespace', width: 'w-36' },
+    { key: 'status', label: 'Status', width: 'w-28' },
+    { key: 'mode', label: 'Mode', width: 'w-20' },
+    { key: 'age', label: 'Age', width: 'w-20' },
+  ],
+  domainmappings: [
+    { key: 'name', label: 'Name' },
+    { key: 'namespace', label: 'Namespace', width: 'w-36' },
+    { key: 'status', label: 'Status', width: 'w-28' },
+    { key: 'url', label: 'URL', width: 'w-56' },
+    { key: 'age', label: 'Age', width: 'w-20' },
+  ],
+}
+
+// Map (plural, group) → KNOWN_COLUMNS key for kinds that collide with core K8s
+const GROUP_QUALIFIED_COLUMN_KEYS: Record<string, Record<string, string>> = {
+  services: { 'serving.knative.dev': 'knativeservices' },
+  configurations: { 'serving.knative.dev': 'knativeconfigurations' },
+  revisions: { 'serving.knative.dev': 'knativerevisions' },
+  routes: { 'serving.knative.dev': 'knativeroutes' },
+  ingresses: { 'networking.internal.knative.dev': 'knativeingresses' },
+  certificates: { 'networking.internal.knative.dev': 'knativecertificates' },
 }
 
 // Normalize a kind name to its plural API form used in KNOWN_COLUMNS keys.
 // Handles CRD singular names from URLs: 'ScaledObject' → 'scaledobjects', 'NodePool' → 'nodepools'
-function normalizeKindToPlural(kind: string): string {
+// When group is provided, resolves collisions (e.g., 'services' + 'serving.knative.dev' → 'knativeservices')
+function normalizeKindToPlural(kind: string, group?: string): string {
   const lower = kind.toLowerCase()
+  // Check group-qualified mapping first for collision resolution
+  if (group && GROUP_QUALIFIED_COLUMN_KEYS[lower]?.[group]) {
+    return GROUP_QUALIFIED_COLUMN_KEYS[lower][group]
+  }
   if (KNOWN_COLUMNS[lower]) return lower
-  if (KNOWN_COLUMNS[lower + 's']) return lower + 's'
+  // Try adding 's' but avoid double-s (e.g., "ingress" → "ingresss")
+  if (!lower.endsWith('s') && KNOWN_COLUMNS[lower + 's']) return lower + 's'
+  // Try 'es' for kinds ending in s/sh/ch/x/z (e.g., "ingress" → "ingresses")
+  if (KNOWN_COLUMNS[lower + 'es']) return lower + 'es'
   return lower
 }
 
-function getColumnsForKind(kind: string): Column[] {
-  return KNOWN_COLUMNS[normalizeKindToPlural(kind)] || DEFAULT_COLUMNS
+function getColumnsForKind(kind: string, group?: string): Column[] {
+  return KNOWN_COLUMNS[normalizeKindToPlural(kind, group)] || DEFAULT_COLUMNS
 }
 
 // Get the default visible columns for a kind
@@ -1114,25 +1295,25 @@ interface ColumnSettings {
   widths: Record<string, number>
 }
 
-function loadColumnSettings(kind: string): ColumnSettings | null {
+function loadColumnSettings(kind: string, group?: string): ColumnSettings | null {
   try {
-    const key = COLUMN_SETTINGS_PREFIX + normalizeKindToPlural(kind)
+    const key = COLUMN_SETTINGS_PREFIX + normalizeKindToPlural(kind, group)
     const raw = localStorage.getItem(key)
     if (raw) return JSON.parse(raw)
   } catch { /* ignore */ }
   return null
 }
 
-function saveColumnSettings(kind: string, settings: ColumnSettings) {
+function saveColumnSettings(kind: string, group: string | undefined, settings: ColumnSettings) {
   try {
-    const key = COLUMN_SETTINGS_PREFIX + normalizeKindToPlural(kind)
+    const key = COLUMN_SETTINGS_PREFIX + normalizeKindToPlural(kind, group)
     localStorage.setItem(key, JSON.stringify(settings))
   } catch { /* ignore */ }
 }
 
-function clearColumnSettings(kind: string) {
+function clearColumnSettings(kind: string, group?: string) {
   try {
-    const key = COLUMN_SETTINGS_PREFIX + normalizeKindToPlural(kind)
+    const key = COLUMN_SETTINGS_PREFIX + normalizeKindToPlural(kind, group)
     localStorage.removeItem(key)
   } catch { /* ignore */ }
 }
@@ -1164,9 +1345,12 @@ function getInitialKindFromURL(): SelectedKindInfo {
   const group = new URLSearchParams(window.location.search).get('apiGroup') || ''
   if (kind) {
     // Find matching resource from CORE_RESOURCES or use as-is
-    const coreMatch = CORE_RESOURCES.find(r => r.kind === kind || r.name === kind)
-    if (coreMatch) {
-      return { name: coreMatch.name, kind: coreMatch.kind, group: coreMatch.group }
+    // Only match core resources when no apiGroup is specified (avoids collisions like KNative Service)
+    if (!group) {
+      const coreMatch = CORE_RESOURCES.find(r => r.kind === kind || r.name === kind)
+      if (coreMatch) {
+        return { name: coreMatch.name, kind: coreMatch.kind, group: coreMatch.group }
+      }
     }
     return { name: kind, kind: kind, group }
   }
@@ -1310,10 +1494,10 @@ export function ResourcesView({ namespaces, selectedResource, onResourceClick, o
   }, [topPodMetrics, topNodeMetrics])
 
   // Load column settings from localStorage when kind changes
-  const allColumns = useMemo(() => getColumnsForKind(selectedKind.name), [selectedKind.name])
+  const allColumns = useMemo(() => getColumnsForKind(selectedKind.name, selectedKind.group), [selectedKind.name, selectedKind.group])
 
   useEffect(() => {
-    const saved = loadColumnSettings(selectedKind.name)
+    const saved = loadColumnSettings(selectedKind.name, selectedKind.group)
     if (saved) {
       // If saved columns are just the defaults but this kind has specialized columns,
       // discard the stale save and use the specialized columns instead
@@ -1322,7 +1506,7 @@ export function ResourcesView({ namespaces, selectedResource, onResourceClick, o
         saved.visible.length === defaultKeys.length &&
         saved.visible.every(v => defaultKeys.includes(v))
       if (isStaleDefaults) {
-        clearColumnSettings(selectedKind.name)
+        clearColumnSettings(selectedKind.name, selectedKind.group)
         setVisibleColumns(getDefaultVisibleColumns(allColumns))
         setColumnWidths({})
       } else {
@@ -1333,7 +1517,7 @@ export function ResourcesView({ namespaces, selectedResource, onResourceClick, o
       setVisibleColumns(getDefaultVisibleColumns(allColumns))
       setColumnWidths({})
     }
-  }, [selectedKind.name, allColumns])
+  }, [selectedKind.name, selectedKind.group, allColumns])
 
   // Save column settings when they change (skip initial load)
   const isColumnSettingsLoaded = useRef(false)
@@ -1343,11 +1527,11 @@ export function ResourcesView({ namespaces, selectedResource, onResourceClick, o
       isColumnSettingsLoaded.current = true
       return
     }
-    saveColumnSettings(selectedKind.name, {
+    saveColumnSettings(selectedKind.name, selectedKind.group, {
       visible: Array.from(visibleColumns),
       widths: columnWidths,
     })
-  }, [visibleColumns, columnWidths, selectedKind.name])
+  }, [visibleColumns, columnWidths, selectedKind.name, selectedKind.group])
 
   // Close column picker on outside click or Escape
   useEffect(() => {
@@ -1449,11 +1633,11 @@ export function ResourcesView({ namespaces, selectedResource, onResourceClick, o
 
   // Reset column settings to defaults
   const resetColumnSettings = useCallback(() => {
-    clearColumnSettings(selectedKind.name)
+    clearColumnSettings(selectedKind.name, selectedKind.group)
     setVisibleColumns(getDefaultVisibleColumns(allColumns))
     setColumnWidths({})
     isColumnSettingsLoaded.current = false
-  }, [selectedKind.name, allColumns])
+  }, [selectedKind.name, selectedKind.group, allColumns])
 
   // Keyboard shortcut: / to focus search
   useRegisterShortcut({
@@ -1874,7 +2058,12 @@ export function ResourcesView({ namespaces, selectedResource, onResourceClick, o
     // Prefer matching from resourcesToCount (deduped list used for queries) to ensure group consistency.
     // Raw apiResources can have duplicates (e.g., Event in both v1 and events.k8s.io) where find()
     // returns a different group than categorizeResources() deduped to, causing query index mismatch.
+    // When selectedResource has a group, match on group too to handle collisions (e.g., KNative Service vs core Service).
+    const resourceGroup = selectedResource.group ?? ''
     const countMatch = resourcesToCount.find(r =>
+      (r.name.toLowerCase() === resourceKindLower || r.kind.toLowerCase() === resourceKindLower) &&
+      r.group === resourceGroup
+    ) ?? resourcesToCount.find(r =>
       r.name.toLowerCase() === resourceKindLower ||
       r.kind.toLowerCase() === resourceKindLower
     )
@@ -1889,6 +2078,9 @@ export function ResourcesView({ namespaces, selectedResource, onResourceClick, o
 
     // Fall back to raw API resources for kinds not yet in categories
     const apiMatch = apiResources?.find(r =>
+      (r.name.toLowerCase() === resourceKindLower || r.kind.toLowerCase() === resourceKindLower) &&
+      r.group === resourceGroup
+    ) ?? apiResources?.find(r =>
       r.name.toLowerCase() === resourceKindLower ||
       r.kind.toLowerCase() === resourceKindLower
     )
@@ -2025,22 +2217,23 @@ export function ResourcesView({ namespaces, selectedResource, onResourceClick, o
     }
   }, [dataUpdatedAt])
 
-  // Derive counts from all query results
+  // Derive counts from all query results (keyed by group/kind to handle collisions like KNative Service vs core Service)
   const counts = useMemo(() => {
     const results: Record<string, number> = {}
     resourcesToCount.forEach((resource, index) => {
       const data = resourceQueries[index]?.data
-      results[resource.kind] = Array.isArray(data) ? data.length : 0
+      const key = resource.group ? `${resource.group}/${resource.kind}` : resource.kind
+      results[key] = Array.isArray(data) ? data.length : 0
     })
     return results
   }, [resourcesToCount, resourceQueries])
 
-  // Track which resource kinds returned 403 Forbidden
+  // Track which resource kinds returned 403 Forbidden (keyed by group/kind for collision safety)
   const forbiddenKinds = useMemo(() => {
     const result = new Set<string>()
     resourcesToCount.forEach((resource, index) => {
       if (isForbiddenError(resourceQueries[index]?.error)) {
-        result.add(resource.kind)
+        result.add(resource.group ? `${resource.group}/${resource.kind}` : resource.kind)
       }
     })
     return result
@@ -2215,7 +2408,7 @@ export function ResourcesView({ namespaces, selectedResource, onResourceClick, o
     // Apply column filters (generic, multi-select per column — OR within column, AND across columns)
     const activeColFilters = Object.entries(columnFilters).filter(([, vals]) => vals.length > 0)
     if (activeColFilters.length > 0) {
-      const kindLower = normalizeKindToPlural(selectedKind.name)
+      const kindLower = normalizeKindToPlural(selectedKind.name, selectedKind.group)
       result = result.filter((r: any) =>
         activeColFilters.every(([col, vals]) =>
           vals.includes(getCellFilterValue(r, col, kindLower))
@@ -2281,7 +2474,7 @@ export function ResourcesView({ namespaces, selectedResource, onResourceClick, o
       })
     } else {
       // Default sort by kind
-      const kindLower = normalizeKindToPlural(selectedKind.name)
+      const kindLower = normalizeKindToPlural(selectedKind.name, selectedKind.group)
 
       if (kindLower === 'pods') {
         // Completed pods at bottom
@@ -2413,13 +2606,13 @@ export function ResourcesView({ namespaces, selectedResource, onResourceClick, o
 
     const withTotals = categories.map(category => {
       const total = category.resources.reduce(
-        (sum, resource) => sum + (counts?.[resource.kind] ?? 0),
+        (sum, resource) => sum + (counts?.[(resource.group ? `${resource.group}/${resource.kind}` : resource.kind)] ?? 0),
         0
       )
 
       // Filter resources: show if has instances, is core kind, or showEmptyKinds is true
       const visibleResources = category.resources.filter(resource => {
-        const count = counts?.[resource.kind] ?? 0
+        const count = counts?.[(resource.group ? `${resource.group}/${resource.kind}` : resource.kind)] ?? 0
         const isCore = ALWAYS_SHOWN_KINDS.has(resource.kind)
         const shouldShow = count > 0 || isCore || showEmptyKinds
         if (!shouldShow) totalHiddenKinds++
@@ -2537,7 +2730,7 @@ export function ResourcesView({ namespaces, selectedResource, onResourceClick, o
   const filterOptions = useMemo(() => {
     if (!resources || resources.length === 0) return null
 
-    const kindLower = normalizeKindToPlural(selectedKind.name)
+    const kindLower = normalizeKindToPlural(selectedKind.name, selectedKind.group)
     const columns = KNOWN_COLUMNS[kindLower] || DEFAULT_COLUMNS
 
     // Auto-detect filterable columns
@@ -2738,9 +2931,9 @@ export function ResourcesView({ namespaces, selectedResource, onResourceClick, o
                         key={`${p.name}-${p.group}`}
                         ref={isResourceSelected ? selectedSidebarRef : null}
                         resource={{ name: p.name, kind: p.kind, group: p.group, version: '', namespaced: true, isCrd: false, verbs: [] }}
-                        count={counts?.[p.kind] ?? 0}
+                        count={counts?.[(p.group ? `${p.group}/${p.kind}` : p.kind)] ?? 0}
                         isSelected={isResourceSelected}
-                        isForbidden={forbiddenKinds.has(p.kind)}
+                        isForbidden={forbiddenKinds.has(p.group ? `${p.group}/${p.kind}` : p.kind)}
                         isPinned={true}
                         onTogglePin={() => togglePin(p)}
                         onClick={() => {
@@ -2788,9 +2981,9 @@ export function ResourcesView({ namespaces, selectedResource, onResourceClick, o
                           key={resource.name}
                           ref={isResourceSelected ? selectedSidebarRef : null}
                           resource={resource}
-                          count={counts?.[resource.kind] ?? 0}
+                          count={counts?.[(resource.group ? `${resource.group}/${resource.kind}` : resource.kind)] ?? 0}
                           isSelected={isResourceSelected}
-                          isForbidden={forbiddenKinds.has(resource.kind)}
+                          isForbidden={forbiddenKinds.has(resource.group ? `${resource.group}/${resource.kind}` : resource.kind)}
                           isPinned={isPinned(resource.name, resource.group)}
                           onTogglePin={() => togglePin({ name: resource.name, kind: resource.kind, group: resource.group })}
                           onClick={() => {
@@ -2816,7 +3009,7 @@ export function ResourcesView({ namespaces, selectedResource, onResourceClick, o
                 : type.label
               const Icon = getResourceIcon(kindKey)
               const count = counts?.[kindKey] ?? 0
-              const isSelected = selectedKind.name === type.kind
+              const isSelected = selectedKind.name === type.kind && !selectedKind.group
               return (
                 <button
                   key={type.kind}
@@ -3351,6 +3544,7 @@ export function ResourcesView({ namespaces, selectedResource, onResourceClick, o
                       ref={isSelected ? selectedRowRef : isHighlighted ? highlightedRowRef : null}
                       resource={resource}
                       kind={selectedKind.name}
+                      group={selectedKind.group}
                       columns={columns}
                       hasSpacerColumn={hasResizedColumns}
                       isSelected={isSelected}
@@ -3452,6 +3646,7 @@ const ResourceTypeButton = forwardRef<HTMLButtonElement, ResourceTypeButtonProps
 interface ResourceRowProps {
   resource: any
   kind: string
+  group?: string
   columns: Column[]
   hasSpacerColumn: boolean
   isSelected?: boolean
@@ -3462,7 +3657,7 @@ interface ResourceRowProps {
 }
 
 const ResourceRow = forwardRef<HTMLTableCellElement, ResourceRowProps>(
-  function ResourceRow({ resource, kind, columns, hasSpacerColumn, isSelected, isHighlighted, majorityNodeMinorVersion, onClick, onMouseEnter }, ref) {
+  function ResourceRow({ resource, kind, group, columns, hasSpacerColumn, isSelected, isHighlighted, majorityNodeMinorVersion, onClick, onMouseEnter }, ref) {
     return (
       <tr
         className="group/row contents"
@@ -3483,7 +3678,7 @@ const ResourceRow = forwardRef<HTMLTableCellElement, ResourceRowProps>(
                 : 'group-hover/row:bg-theme-surface/50'
           )}
         >
-          <CellContent resource={resource} kind={kind} column={col.key} majorityNodeMinorVersion={majorityNodeMinorVersion} />
+          <CellContent resource={resource} kind={kind} group={group} column={col.key} majorityNodeMinorVersion={majorityNodeMinorVersion} />
         </td>
       ))}
       {hasSpacerColumn && <td className="border-b-subtle p-0" />}
@@ -3516,10 +3711,11 @@ interface CellContentProps {
   resource: any
   kind: string
   column: string
+  group?: string
   majorityNodeMinorVersion?: string
 }
 
-function CellContent({ resource, kind, column, majorityNodeMinorVersion }: CellContentProps) {
+function CellContent({ resource, kind, column, group, majorityNodeMinorVersion }: CellContentProps) {
   const meta = resource.metadata || {}
 
   // Common columns
@@ -3556,7 +3752,7 @@ function CellContent({ resource, kind, column, majorityNodeMinorVersion }: CellC
   }
 
   // Kind-specific columns (normalize CRD singular names like 'ScaledObject' → 'scaledobjects')
-  const kindLower = normalizeKindToPlural(kind)
+  const kindLower = normalizeKindToPlural(kind, group)
   switch (kindLower) {
     case 'pods':
       return <PodCell resource={resource} column={column} />
@@ -3757,6 +3953,52 @@ function CellContent({ resource, kind, column, majorityNodeMinorVersion }: CellC
       return <PeerAuthenticationCell resource={resource} column={column} />
     case 'authorizationpolicies':
       return <AuthorizationPolicyCell resource={resource} column={column} />
+    // Knative Serving
+    case 'knativeservices':
+      return <KnativeServiceCell resource={resource} column={column} />
+    case 'knativeconfigurations':
+      return <KnativeConfigurationCell resource={resource} column={column} />
+    case 'knativerevisions':
+      return <KnativeRevisionCell resource={resource} column={column} />
+    case 'knativeroutes':
+      return <KnativeRouteCell resource={resource} column={column} />
+    // Knative Eventing
+    case 'brokers':
+      return <BrokerCell resource={resource} column={column} />
+    case 'triggers':
+      return <TriggerCell resource={resource} column={column} />
+    case 'eventtypes':
+      return <EventTypeCell resource={resource} column={column} />
+    // Knative Sources
+    case 'pingsources':
+      return <PingSourceCell resource={resource} column={column} />
+    case 'apiserversources':
+      return <ApiServerSourceCell resource={resource} column={column} />
+    case 'containersources':
+      return <ContainerSourceCell resource={resource} column={column} />
+    case 'sinkbindings':
+      return <SinkBindingCell resource={resource} column={column} />
+    // Knative Messaging
+    case 'channels':
+      return <ChannelCell resource={resource} column={column} />
+    case 'inmemorychannels':
+      return <InMemoryChannelCell resource={resource} column={column} />
+    case 'subscriptions':
+      return <SubscriptionCell resource={resource} column={column} />
+    // Knative Flows
+    case 'sequences':
+      return <SequenceCell resource={resource} column={column} />
+    case 'parallels':
+      return <ParallelCell resource={resource} column={column} />
+    // Knative Networking & Serving
+    case 'serverlessservices':
+      return <ServerlessServiceCell resource={resource} column={column} />
+    case 'domainmappings':
+      return <DomainMappingCell resource={resource} column={column} />
+    case 'knativeingresses':
+      return <KnativeIngressCell resource={resource} column={column} />
+    case 'knativecertificates':
+      return <KnativeCertificateCell resource={resource} column={column} />
     default:
       // Generic cell for CRDs and unknown resources
       return <GenericCell resource={resource} column={column} />

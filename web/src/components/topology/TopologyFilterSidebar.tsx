@@ -52,6 +52,19 @@ const RESOURCE_KINDS: {
 
   // Scaling
   { kind: 'HorizontalPodAutoscaler', label: 'HPA', icon: getTopologyIcon('HorizontalPodAutoscaler'), color: 'text-pink-400', category: 'scaling' },
+
+  // Knative
+  { kind: 'KnativeService', label: 'Knative Service', icon: getTopologyIcon('KnativeService'), color: 'text-fuchsia-400', category: 'custom' },
+  { kind: 'KnativeConfiguration', label: 'Knative Config', icon: getTopologyIcon('KnativeConfiguration'), color: 'text-fuchsia-400', category: 'custom' },
+  { kind: 'KnativeRevision', label: 'Revision', icon: getTopologyIcon('KnativeRevision'), color: 'text-fuchsia-400', category: 'custom' },
+  { kind: 'KnativeRoute', label: 'Route', icon: getTopologyIcon('KnativeRoute'), color: 'text-fuchsia-400', category: 'custom' },
+  { kind: 'Broker', label: 'Broker', icon: getTopologyIcon('Broker'), color: 'text-fuchsia-400', category: 'custom' },
+  { kind: 'Channel', label: 'Channel', icon: getTopologyIcon('Channel'), color: 'text-fuchsia-400', category: 'custom' },
+  { kind: 'Trigger', label: 'Trigger', icon: getTopologyIcon('Trigger'), color: 'text-fuchsia-400', category: 'custom' },
+  { kind: 'PingSource', label: 'PingSource', icon: getTopologyIcon('PingSource'), color: 'text-fuchsia-400', category: 'custom' },
+  { kind: 'ApiServerSource', label: 'ApiServerSource', icon: getTopologyIcon('ApiServerSource'), color: 'text-fuchsia-400', category: 'custom' },
+  { kind: 'ContainerSource', label: 'ContainerSource', icon: getTopologyIcon('ContainerSource'), color: 'text-fuchsia-400', category: 'custom' },
+  { kind: 'SinkBinding', label: 'SinkBinding', icon: getTopologyIcon('SinkBinding'), color: 'text-fuchsia-400', category: 'custom' },
 ]
 
 const CATEGORIES = [

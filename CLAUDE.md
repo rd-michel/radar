@@ -453,6 +453,12 @@ GET  /api/ai/resources/{kind}/{ns}/{name}     # Minified single resource (verbos
   - DestinationRule → Service edges (EdgeConfigures, via spec.host)
   - Uses `GetGVRWithGroup("Gateway", "networking.istio.io")` to disambiguate Istio Gateway from Gateway API Gateway
   - Frontend detects Istio vs Gateway API Gateways via `data.apiVersion?.includes('networking.istio.io')`
+- Knative nodes: KnativeService, KnativeConfiguration, KnativeRevision, KnativeRoute (Serving); Broker, Trigger, PingSource, ApiServerSource, ContainerSource, SinkBinding (Eventing/Sources)
+  - Uses "knativeservice/" node ID prefix to disambiguate from core K8s Service; similarly "knativeingress/", "knativecertificate/"
+  - Uses `GetGVRWithGroup("Service", "serving.knative.dev")` for collision-prone kinds (Service, Ingress, Certificate, Configuration, Route, Broker, Channel)
+  - Serving edges: Route → Revision (EdgeExposes, via spec.traffic[].revisionName), Configuration/Revision owner-ref edges
+  - Eventing edges: Trigger → Broker (EdgeExposes), Trigger → subscriber (EdgeExposes), Sources → sink (EdgeExposes)
+  - Frontend detects Knative vs core kinds via `data.apiVersion?.includes('serving.knative.dev')` etc.
 - GitOps nodes: Application (ArgoCD), Kustomization, HelmRelease, GitRepository (FluxCD)
   - Connected to managed resources via status.resources (ArgoCD) or status.inventory (FluxCD Kustomization)
   - HelmRelease connects to resources via FluxCD labels (`helm.toolkit.fluxcd.io/name`) or standard Helm label (`app.kubernetes.io/instance`). Matches Deployment, Service, StatefulSet, DaemonSet, Job, CronJob, Rollout.
@@ -548,7 +554,7 @@ Error responses are parsed as `{"error": "message"}` and displayed in toasts.
 - Use `AlertBanner` for problem detection, `ConditionsSection` for K8s conditions
 - Long text in alerts/banners needs `break-all` class for CSS word breaking
 - Core K8s renderers: Role, ClusterRole, RoleBinding, ClusterRoleBinding, ServiceAccount, IngressClass, PriorityClass, RuntimeClass, Lease, MutatingWebhookConfiguration, ValidatingWebhookConfiguration
-- Supported CRD integrations: Argo Rollouts, Argo Workflows, cert-manager, Gateway API, Bitnami Sealed Secrets, FluxCD, ArgoCD, Trivy Operator, Karpenter, KEDA, VPA, Prometheus Operator, Kyverno/PolicyReport, Velero (Backup, Restore, Schedule, BackupStorageLocation, VolumeSnapshotLocation), External Secrets Operator (ExternalSecret, ClusterExternalSecret, SecretStore, ClusterSecretStore), CloudNativePG (Cluster, Backup, ScheduledBackup, Pooler)
+- Supported CRD integrations: Argo Rollouts, Argo Workflows, cert-manager, Gateway API, Bitnami Sealed Secrets, FluxCD, ArgoCD, Trivy Operator, Karpenter, KEDA, VPA, Prometheus Operator, Kyverno/PolicyReport, Velero (Backup, Restore, Schedule, BackupStorageLocation, VolumeSnapshotLocation), External Secrets Operator (ExternalSecret, ClusterExternalSecret, SecretStore, ClusterSecretStore), CloudNativePG (Cluster, Backup, ScheduledBackup, Pooler), Knative (Service, Configuration, Revision, Route, DomainMapping, Broker, Trigger, EventType, Channel, InMemoryChannel, Subscription, PingSource, ApiServerSource, ContainerSource, SinkBinding, Sequence, Parallel, Ingress, Certificate, ServerlessService)
 
 ## Tech Stack
 

@@ -43,6 +43,17 @@ const (
 	KindServiceEntry         NodeKind = "ServiceEntry"         // Istio ServiceEntry
 	KindPeerAuthentication   NodeKind = "PeerAuthentication"   // Istio PeerAuthentication
 	KindAuthorizationPolicy  NodeKind = "AuthorizationPolicy"  // Istio AuthorizationPolicy
+	KindKnativeService       NodeKind = "KnativeService"       // KNative Serving Service
+	KindKnativeConfiguration NodeKind = "KnativeConfiguration" // KNative Serving Configuration
+	KindKnativeRevision      NodeKind = "KnativeRevision"      // KNative Serving Revision
+	KindKnativeRoute         NodeKind = "KnativeRoute"         // KNative Serving Route
+	KindBroker               NodeKind = "Broker"               // KNative Eventing Broker
+	KindTrigger              NodeKind = "Trigger"              // KNative Eventing Trigger
+	KindPingSource           NodeKind = "PingSource"           // KNative Eventing PingSource
+	KindApiServerSource      NodeKind = "ApiServerSource"      // KNative Eventing ApiServerSource
+	KindContainerSource      NodeKind = "ContainerSource"      // KNative Eventing ContainerSource
+	KindSinkBinding          NodeKind = "SinkBinding"          // KNative Eventing SinkBinding
+	KindChannel              NodeKind = "Channel"              // KNative Messaging Channel
 	KindDaemonSet            NodeKind = "DaemonSet"
 	KindStatefulSet   NodeKind = "StatefulSet"
 	KindReplicaSet    NodeKind = "ReplicaSet"

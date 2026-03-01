@@ -131,6 +131,12 @@ function nodeIdToLaneId(nodeId: string): string | null {
     nodepool: 'NodePool', nodeclaim: 'NodeClaim',
     // cert-manager
     issuer: 'Issuer', clusterissuer: 'ClusterIssuer',
+    // Knative
+    knativeservice: 'KnativeService', knativeconfiguration: 'KnativeConfiguration',
+    knativerevision: 'KnativeRevision', knativeroute: 'KnativeRoute',
+    broker: 'Broker', trigger: 'Trigger', channel: 'Channel',
+    pingsource: 'PingSource', apiserversource: 'ApiServerSource',
+    containersource: 'ContainerSource', sinkbinding: 'SinkBinding',
   }
   return `${kindMap[kind] || kind}/${namespace}/${name}`
 }
@@ -402,6 +408,8 @@ export function buildResourceHierarchy(options: HierarchyOptions): ResourceLane[
       'TCPRoute', 'TLSRoute', 'ConfigMap', 'Secret',
       'Application', 'Kustomization', 'HelmRelease', 'GitRepository',
       'Workflow', 'CronWorkflow',
+      'KnativeService', 'KnativeConfiguration', 'KnativeRevision', 'KnativeRoute',
+      'Broker', 'Trigger',
     ])
 
     // Group lanes by app label
@@ -427,7 +435,10 @@ export function buildResourceHierarchy(options: HierarchyOptions): ResourceLane[
         Deployment: 3, Rollout: 3, StatefulSet: 3, DaemonSet: 3,
         Job: 4, CronJob: 4,
         ConfigMap: 5, Secret: 5,
-        ReplicaSet: 6, Pod: 7
+        ReplicaSet: 6, Pod: 7,
+        KnativeService: 1, KnativeRoute: 2, Broker: 2, Channel: 2,
+        KnativeConfiguration: 3, KnativeRevision: 4, Trigger: 3,
+        PingSource: 3, ApiServerSource: 3, ContainerSource: 3, SinkBinding: 3,
       }
 
       const sorted = [...laneIds].sort((a, b) => {
@@ -484,7 +495,10 @@ export function buildResourceHierarchy(options: HierarchyOptions): ResourceLane[
           Service: 1, Gateway: 1, HTTPRoute: 2, GRPCRoute: 2, TCPRoute: 2, TLSRoute: 2,
           Deployment: 2, Rollout: 2, StatefulSet: 2, DaemonSet: 2,
           Job: 3, CronJob: 3,
-          ReplicaSet: 3, Pod: 4, ConfigMap: 5, Secret: 5
+          ReplicaSet: 3, Pod: 4, ConfigMap: 5, Secret: 5,
+          KnativeService: 1, KnativeRoute: 2, Broker: 1, Channel: 1,
+          KnativeConfiguration: 2, KnativeRevision: 3, Trigger: 2,
+          PingSource: 3, ApiServerSource: 3, ContainerSource: 3, SinkBinding: 3,
         }
         lane.children.sort((a, b) => {
           const aPriority = kindPriority[a.kind] || 10

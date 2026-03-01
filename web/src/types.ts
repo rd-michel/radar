@@ -74,6 +74,17 @@ export type CoreNodeKind =
   | 'PersistentVolumeClaim'
   | 'Node'
   | 'Namespace'
+  | 'KnativeService'
+  | 'KnativeConfiguration'
+  | 'KnativeRevision'
+  | 'KnativeRoute'
+  | 'Broker'
+  | 'Trigger'
+  | 'PingSource'
+  | 'ApiServerSource'
+  | 'ContainerSource'
+  | 'SinkBinding'
+  | 'Channel'
 
 // NodeKind can be a core kind or any arbitrary CRD kind string
 export type NodeKind = CoreNodeKind | (string & {})
@@ -84,6 +95,12 @@ export function displayKind(kind: string): string {
     HorizontalPodAutoscaler: 'HPA',
     PersistentVolumeClaim: 'PVC',
     EC2NodeClass: 'NodeClass',
+    KnativeService: 'Knative Svc',
+    KnativeConfiguration: 'Knative Config',
+    KnativeRevision: 'Revision',
+    KnativeRoute: 'Route',
+    ApiServerSource: 'ApiSrc',
+    ContainerSource: 'ContainerSrc',
   }
   return shortNames[kind] || kind
 }
@@ -219,6 +236,7 @@ export function isWorkloadKind(kind: string): boolean {
     'Application', // ArgoCD Application
     'Kustomization', 'HelmRelease', // FluxCD controllers
     'GitRepository', 'OCIRepository', 'HelmRepository', // FluxCD sources
+    'KnativeService', // Knative Serving
   ].includes(kind)
 }
 
