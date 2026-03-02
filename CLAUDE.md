@@ -549,12 +549,14 @@ useMutation({
 Error responses are parsed as `{"error": "message"}` and displayed in toasts.
 
 ### Resource Renderers
+- **Adding a new CRD integration? See [docs/INTEGRATION_GUIDE.md](docs/INTEGRATION_GUIDE.md)** for the full step-by-step checklist with all files, patterns, and collision gotchas.
 - Sections with data should use `defaultExpanded` (true) — only collapse empty or low-priority sections
-- Register in: `renderers/index.ts` (export), `ResourceDetailDrawer.tsx` (import + knownKinds + render line)
+- Register in: `renderers/index.ts` (export), `ResourceDetailDrawer.tsx` (import + knownKinds + render line + `getResourceStatus()`)
 - Use `AlertBanner` for problem detection, `ConditionsSection` for K8s conditions
 - Long text in alerts/banners needs `break-all` class for CSS word breaking
+- **Kind collision rule:** When a CRD kind collides with a core K8s kind (e.g., Knative Service vs core Service), you must guard THREE places in `ResourceDetailDrawer.tsx`: (1) the core renderer line, (2) `getResourceStatus()`, (3) action buttons (Port Forward, etc.). Use `data?.apiVersion?.includes('group.name')` checks. Missing any one causes dual rendering bugs.
 - Core K8s renderers: Role, ClusterRole, RoleBinding, ClusterRoleBinding, ServiceAccount, IngressClass, PriorityClass, RuntimeClass, Lease, MutatingWebhookConfiguration, ValidatingWebhookConfiguration
-- Supported CRD integrations: Argo Rollouts, Argo Workflows, cert-manager, Gateway API, Bitnami Sealed Secrets, FluxCD, ArgoCD, Trivy Operator, Karpenter, KEDA, VPA, Prometheus Operator, Kyverno/PolicyReport, Velero (Backup, Restore, Schedule, BackupStorageLocation, VolumeSnapshotLocation), External Secrets Operator (ExternalSecret, ClusterExternalSecret, SecretStore, ClusterSecretStore), CloudNativePG (Cluster, Backup, ScheduledBackup, Pooler), Knative (Service, Configuration, Revision, Route, DomainMapping, Broker, Trigger, EventType, Channel, InMemoryChannel, Subscription, PingSource, ApiServerSource, ContainerSource, SinkBinding, Sequence, Parallel, Ingress, Certificate, ServerlessService)
+- CRD integrations: Argo Rollouts, Argo Workflows, cert-manager, Gateway API, Sealed Secrets, FluxCD, ArgoCD, Trivy, Karpenter, KEDA, VPA, Prometheus Operator, Kyverno, Velero, External Secrets, CloudNativePG, Knative, Istio
 
 ## Tech Stack
 
