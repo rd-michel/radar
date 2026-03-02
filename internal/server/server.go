@@ -623,6 +623,7 @@ func (s *Server) handleListResources(w http.ResponseWriter, r *http.Request) {
 						s.writeError(w, http.StatusBadRequest, listErr.Error())
 						return
 					}
+					log.Printf("[resources] Failed to list %s in namespace %s (group=%s): %v", kind, ns, group, listErr)
 					s.writeError(w, http.StatusInternalServerError, listErr.Error())
 					return
 				}
@@ -827,6 +828,7 @@ func (s *Server) handleListResources(w http.ResponseWriter, r *http.Request) {
 						s.writeError(w, http.StatusBadRequest, listErr.Error())
 						return
 					}
+					log.Printf("[resources] Failed to list %s in namespace %s: %v", kind, ns, listErr)
 					s.writeError(w, http.StatusInternalServerError, listErr.Error())
 					return
 				}

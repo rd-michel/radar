@@ -2,43 +2,30 @@
 
 import { clsx } from 'clsx'
 import {
-  getKnativeServiceStatus,
+  getKnativeConditionStatus,
   getKnativeServiceUrl,
   getKnativeServiceLatestRevision,
   getKnativeServiceTraffic,
   getRevisionStatus,
   getRevisionImage,
   getRevisionConcurrency,
-  getRouteStatus,
   getRouteUrl,
   getRouteTraffic,
-  getConfigurationStatus,
   getConfigurationLatestCreated,
   getConfigurationLatestReady,
-  getBrokerStatus,
   getBrokerAddress,
-  getTriggerStatus,
   getTriggerBroker,
   getTriggerSubscriber,
   getTriggerFilter,
-  getSourceStatus,
   getSourceSink,
   getPingSourceSchedule,
   getPingSourceData,
-  getChannelStatus,
   getChannelAddress,
-  getSubscriptionStatus,
   getSubscriptionChannel,
   getSubscriptionSubscriber,
-  getSequenceStatus,
   getSequenceStepCount,
-  getParallelStatus,
   getParallelBranchCount,
-  getDomainMappingStatus,
   getDomainMappingUrl,
-  getKnativeIngressStatus,
-  getKnativeCertificateStatus,
-  getServerlessServiceStatus,
   getServerlessServiceMode,
 } from '../resource-utils-knative'
 
@@ -70,7 +57,7 @@ function DefaultCell() {
 export function KnativeServiceCell({ resource, column }: { resource: any; column: string }) {
   switch (column) {
     case 'status':
-      return <StatusCell resource={resource} getStatus={getKnativeServiceStatus} />
+      return <StatusCell resource={resource} getStatus={getKnativeConditionStatus} />
     case 'url':
       return <TextCell value={getKnativeServiceUrl(resource)} />
     case 'latestRevision':
@@ -112,7 +99,7 @@ export function RevisionCell({ resource, column }: { resource: any; column: stri
 export function RouteCell({ resource, column }: { resource: any; column: string }) {
   switch (column) {
     case 'status':
-      return <StatusCell resource={resource} getStatus={getRouteStatus} />
+      return <StatusCell resource={resource} getStatus={getKnativeConditionStatus} />
     case 'url':
       return <TextCell value={getRouteUrl(resource)} />
     case 'traffic':
@@ -129,7 +116,7 @@ export function RouteCell({ resource, column }: { resource: any; column: string 
 export function ConfigurationCell({ resource, column }: { resource: any; column: string }) {
   switch (column) {
     case 'status':
-      return <StatusCell resource={resource} getStatus={getConfigurationStatus} />
+      return <StatusCell resource={resource} getStatus={getKnativeConditionStatus} />
     case 'latestCreated':
       return <TextCell value={getConfigurationLatestCreated(resource)} />
     case 'latestReady':
@@ -146,7 +133,7 @@ export function ConfigurationCell({ resource, column }: { resource: any; column:
 export function BrokerCell({ resource, column }: { resource: any; column: string }) {
   switch (column) {
     case 'status':
-      return <StatusCell resource={resource} getStatus={getBrokerStatus} />
+      return <StatusCell resource={resource} getStatus={getKnativeConditionStatus} />
     case 'address':
       return <TextCell value={getBrokerAddress(resource)} />
     default:
@@ -161,7 +148,7 @@ export function BrokerCell({ resource, column }: { resource: any; column: string
 export function TriggerCell({ resource, column }: { resource: any; column: string }) {
   switch (column) {
     case 'status':
-      return <StatusCell resource={resource} getStatus={getTriggerStatus} />
+      return <StatusCell resource={resource} getStatus={getKnativeConditionStatus} />
     case 'broker':
       return <TextCell value={getTriggerBroker(resource)} />
     case 'subscriber':
@@ -202,7 +189,7 @@ export function EventTypeCell({ resource, column }: { resource: any; column: str
 export function PingSourceCell({ resource, column }: { resource: any; column: string }) {
   switch (column) {
     case 'status':
-      return <StatusCell resource={resource} getStatus={getSourceStatus} />
+      return <StatusCell resource={resource} getStatus={getKnativeConditionStatus} />
     case 'schedule':
       return <TextCell value={getPingSourceSchedule(resource)} />
     case 'sink':
@@ -215,13 +202,13 @@ export function PingSourceCell({ resource, column }: { resource: any; column: st
 }
 
 // ============================================================================
-// APISERVERSOURCE
+// APISERVERSOURCE / CONTAINERSOURCE (identical columns: status + sink)
 // ============================================================================
 
-export function ApiServerSourceCell({ resource, column }: { resource: any; column: string }) {
+function SourceCell({ resource, column }: { resource: any; column: string }) {
   switch (column) {
     case 'status':
-      return <StatusCell resource={resource} getStatus={getSourceStatus} />
+      return <StatusCell resource={resource} getStatus={getKnativeConditionStatus} />
     case 'sink':
       return <TextCell value={getSourceSink(resource)} />
     default:
@@ -229,20 +216,7 @@ export function ApiServerSourceCell({ resource, column }: { resource: any; colum
   }
 }
 
-// ============================================================================
-// CONTAINERSOURCE
-// ============================================================================
-
-export function ContainerSourceCell({ resource, column }: { resource: any; column: string }) {
-  switch (column) {
-    case 'status':
-      return <StatusCell resource={resource} getStatus={getSourceStatus} />
-    case 'sink':
-      return <TextCell value={getSourceSink(resource)} />
-    default:
-      return <DefaultCell />
-  }
-}
+export { SourceCell as ApiServerSourceCell, SourceCell as ContainerSourceCell }
 
 // ============================================================================
 // SINKBINDING
@@ -251,7 +225,7 @@ export function ContainerSourceCell({ resource, column }: { resource: any; colum
 export function SinkBindingCell({ resource, column }: { resource: any; column: string }) {
   switch (column) {
     case 'status':
-      return <StatusCell resource={resource} getStatus={getSourceStatus} />
+      return <StatusCell resource={resource} getStatus={getKnativeConditionStatus} />
     case 'sink':
       return <TextCell value={getSourceSink(resource)} />
     case 'subject': {
@@ -270,13 +244,13 @@ export function SinkBindingCell({ resource, column }: { resource: any; column: s
 }
 
 // ============================================================================
-// CHANNEL
+// CHANNEL / INMEMORYCHANNEL (identical columns: status + address)
 // ============================================================================
 
-export function ChannelCell({ resource, column }: { resource: any; column: string }) {
+function ChannelCellBase({ resource, column }: { resource: any; column: string }) {
   switch (column) {
     case 'status':
-      return <StatusCell resource={resource} getStatus={getChannelStatus} />
+      return <StatusCell resource={resource} getStatus={getKnativeConditionStatus} />
     case 'address':
       return <TextCell value={getChannelAddress(resource)} />
     default:
@@ -284,20 +258,7 @@ export function ChannelCell({ resource, column }: { resource: any; column: strin
   }
 }
 
-// ============================================================================
-// INMEMORYCHANNEL
-// ============================================================================
-
-export function InMemoryChannelCell({ resource, column }: { resource: any; column: string }) {
-  switch (column) {
-    case 'status':
-      return <StatusCell resource={resource} getStatus={getChannelStatus} />
-    case 'address':
-      return <TextCell value={getChannelAddress(resource)} />
-    default:
-      return <DefaultCell />
-  }
-}
+export { ChannelCellBase as ChannelCell, ChannelCellBase as InMemoryChannelCell }
 
 // ============================================================================
 // SUBSCRIPTION
@@ -306,7 +267,7 @@ export function InMemoryChannelCell({ resource, column }: { resource: any; colum
 export function SubscriptionCell({ resource, column }: { resource: any; column: string }) {
   switch (column) {
     case 'status':
-      return <StatusCell resource={resource} getStatus={getSubscriptionStatus} />
+      return <StatusCell resource={resource} getStatus={getKnativeConditionStatus} />
     case 'channel':
       return <TextCell value={getSubscriptionChannel(resource)} />
     case 'subscriber':
@@ -323,7 +284,7 @@ export function SubscriptionCell({ resource, column }: { resource: any; column: 
 export function SequenceCell({ resource, column }: { resource: any; column: string }) {
   switch (column) {
     case 'status':
-      return <StatusCell resource={resource} getStatus={getSequenceStatus} />
+      return <StatusCell resource={resource} getStatus={getKnativeConditionStatus} />
     case 'steps':
       return <NumberCell value={getSequenceStepCount(resource)} />
     default:
@@ -338,7 +299,7 @@ export function SequenceCell({ resource, column }: { resource: any; column: stri
 export function ParallelCell({ resource, column }: { resource: any; column: string }) {
   switch (column) {
     case 'status':
-      return <StatusCell resource={resource} getStatus={getParallelStatus} />
+      return <StatusCell resource={resource} getStatus={getKnativeConditionStatus} />
     case 'branches':
       return <NumberCell value={getParallelBranchCount(resource)} />
     default:
@@ -353,7 +314,7 @@ export function ParallelCell({ resource, column }: { resource: any; column: stri
 export function DomainMappingCell({ resource, column }: { resource: any; column: string }) {
   switch (column) {
     case 'status':
-      return <StatusCell resource={resource} getStatus={getDomainMappingStatus} />
+      return <StatusCell resource={resource} getStatus={getKnativeConditionStatus} />
     case 'url':
       return <TextCell value={getDomainMappingUrl(resource)} />
     default:
@@ -368,7 +329,7 @@ export function DomainMappingCell({ resource, column }: { resource: any; column:
 export function KnativeIngressCell({ resource, column }: { resource: any; column: string }) {
   switch (column) {
     case 'status':
-      return <StatusCell resource={resource} getStatus={getKnativeIngressStatus} />
+      return <StatusCell resource={resource} getStatus={getKnativeConditionStatus} />
     case 'ingressClass': {
       const cls = resource?.metadata?.annotations?.['networking.knative.dev/ingress.class'] || '-'
       // Show just the short name (e.g., "kourier" from "kourier.ingress.networking.knative.dev")
@@ -398,7 +359,7 @@ export function KnativeIngressCell({ resource, column }: { resource: any; column
 export function KnativeCertificateCell({ resource, column }: { resource: any; column: string }) {
   switch (column) {
     case 'status':
-      return <StatusCell resource={resource} getStatus={getKnativeCertificateStatus} />
+      return <StatusCell resource={resource} getStatus={getKnativeConditionStatus} />
     case 'dnsNames': {
       const names = resource?.spec?.dnsNames || []
       return <TextCell value={names.length > 0 ? names.join(', ') : '-'} />
@@ -417,7 +378,7 @@ export function KnativeCertificateCell({ resource, column }: { resource: any; co
 export function ServerlessServiceCell({ resource, column }: { resource: any; column: string }) {
   switch (column) {
     case 'status':
-      return <StatusCell resource={resource} getStatus={getServerlessServiceStatus} />
+      return <StatusCell resource={resource} getStatus={getKnativeConditionStatus} />
     case 'mode': {
       const mode = getServerlessServiceMode(resource)
       return (

@@ -95,21 +95,8 @@ import {
 } from './resource-utils-istio'
 import { getCNPGClusterStatus, getCNPGBackupStatus, getCNPGScheduledBackupStatus, getCNPGPoolerStatus } from './resource-utils-cnpg'
 import {
-  getKnativeServiceStatus,
-  getRevisionStatus as getKnativeRevisionStatus,
-  getRouteStatus as getKnativeRouteStatus,
-  getConfigurationStatus as getKnativeConfigurationStatus,
-  getKnativeIngressStatus,
-  getKnativeCertificateStatus,
-  getServerlessServiceStatus,
-  getBrokerStatus,
-  getTriggerStatus,
-  getSourceStatus as getKnativeSourceStatus,
-  getChannelStatus,
-  getSubscriptionStatus,
-  getSequenceStatus,
-  getParallelStatus,
-  getDomainMappingStatus,
+  getKnativeConditionStatus,
+  getRevisionStatus,
 } from './resource-utils-knative'
 import { getExternalSecretStatus, getClusterExternalSecretStatus, getSecretStoreStatus, getClusterSecretStoreStatus } from './resource-utils-eso'
 import {
@@ -1896,7 +1883,7 @@ function getResourceStatus(kind: string, data: any): { text: string; color: stri
   if (k === 'services') {
     // KNative Service uses its own status function
     if (data.apiVersion?.includes('serving.knative.dev')) {
-      const status = getKnativeServiceStatus(data)
+      const status = getKnativeConditionStatus(data)
       return { text: status.text, color: status.color }
     }
     const status = getServiceStatus(data)
@@ -1941,7 +1928,7 @@ function getResourceStatus(kind: string, data: any): { text: string; color: stri
   if (k === 'certificates') {
     // KNative Certificate uses its own status function
     if (data.apiVersion?.includes('networking.internal.knative.dev')) {
-      const status = getKnativeCertificateStatus(data)
+      const status = getKnativeConditionStatus(data)
       return { text: status.text, color: status.color }
     }
     const status = getCertificateStatus(data)
@@ -2207,90 +2194,23 @@ function getResourceStatus(kind: string, data: any): { text: string; color: stri
     return { text: status.text, color: status.color }
   }
 
-  // Knative Serving
-  if (k === 'knativeservices' || (k === 'services' && data.apiVersion?.includes('serving.knative.dev'))) {
-    const status = getKnativeServiceStatus(data)
-    return { text: status.text, color: status.color }
-  }
-
-  if (k === 'knativeconfigurations') {
-    const status = getKnativeConfigurationStatus(data)
-    return { text: status.text, color: status.color }
-  }
-
+  // Knative Revisions have custom status logic (scaled-to-zero, activating)
   if (k === 'knativerevisions') {
-    const status = getKnativeRevisionStatus(data)
+    const status = getRevisionStatus(data)
     return { text: status.text, color: status.color }
   }
 
-  if (k === 'knativeroutes') {
-    const status = getKnativeRouteStatus(data)
-    return { text: status.text, color: status.color }
-  }
-
-  // Knative Eventing
-  if (k === 'brokers') {
-    const status = getBrokerStatus(data)
-    return { text: status.text, color: status.color }
-  }
-
-  if (k === 'triggers') {
-    const status = getTriggerStatus(data)
-    return { text: status.text, color: status.color }
-  }
-
-  // Knative Sources
-  if (k === 'pingsources' || k === 'apiserversources' || k === 'containersources' || k === 'sinkbindings') {
-    const status = getKnativeSourceStatus(data)
-    return { text: status.text, color: status.color }
-  }
-
-  // Knative Eventing/Messaging
-  if (k === 'channels' || k === 'inmemorychannels') {
-    const status = getChannelStatus(data)
-    return { text: status.text, color: status.color }
-  }
-
-  if (k === 'subscriptions') {
-    const status = getSubscriptionStatus(data)
-    return { text: status.text, color: status.color }
-  }
-
-  // Knative Flows
-  if (k === 'sequences') {
-    const status = getSequenceStatus(data)
-    return { text: status.text, color: status.color }
-  }
-
-  if (k === 'parallels') {
-    const status = getParallelStatus(data)
-    return { text: status.text, color: status.color }
-  }
-
-  // Knative Serving
-  if (k === 'domainmappings') {
-    const status = getDomainMappingStatus(data)
-    return { text: status.text, color: status.color }
-  }
-
-  // Knative Networking
-  if (k === 'ingresses' && data.apiVersion?.includes('networking.internal.knative.dev')) {
-    const status = getKnativeIngressStatus(data)
-    return { text: status.text, color: status.color }
-  }
-
-  if (k === 'knativeingresses') {
-    const status = getKnativeIngressStatus(data)
-    return { text: status.text, color: status.color }
-  }
-
-  if ((k === 'certificates' && data.apiVersion?.includes('networking.internal.knative.dev')) || k === 'knativecertificates') {
-    const status = getKnativeCertificateStatus(data)
-    return { text: status.text, color: status.color }
-  }
-
-  if (k === 'serverlessservices') {
-    const status = getServerlessServiceStatus(data)
+  // All other KNative resources use the standard Ready condition pattern
+  const knativeConditionKinds = [
+    'knativeservices', 'knativeconfigurations', 'knativeroutes',
+    'brokers', 'triggers',
+    'pingsources', 'apiserversources', 'containersources', 'sinkbindings',
+    'channels', 'inmemorychannels', 'subscriptions',
+    'sequences', 'parallels',
+    'domainmappings', 'knativeingresses', 'knativecertificates', 'serverlessservices',
+  ]
+  if (knativeConditionKinds.includes(k) || (k === 'ingresses' && data.apiVersion?.includes('networking.internal.knative.dev'))) {
+    const status = getKnativeConditionStatus(data)
     return { text: status.text, color: status.color }
   }
 

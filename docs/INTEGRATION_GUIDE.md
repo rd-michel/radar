@@ -21,7 +21,7 @@ Common collisions:
 | Gateway | `gateway.networking.k8s.io` | Istio `networking.istio.io` |
 | Certificate | cert-manager `cert-manager.io` | Knative `networking.internal.knative.dev` |
 | Configuration | — | Knative `serving.knative.dev` |
-| Route | `gateway.networking.k8s.io` (HTTPRoute) | Knative `serving.knative.dev`, OpenShift |
+| Route | — | Knative `serving.knative.dev`, OpenShift |
 | Broker | — | Knative `eventing.knative.dev` |
 | Channel | — | Knative `messaging.knative.dev` |
 | Backup | Velero `velero.io` | CloudNativePG `cnpg.io` |
@@ -72,7 +72,7 @@ Edge type semantics (choose carefully):
 | Edge Type | Meaning | Example |
 |-----------|---------|---------|
 | `EdgeManages` | Owner relationship | Deployment → ReplicaSet |
-| `EdgeExposes` | Network exposure | Service → Pod, Route → Revision |
+| `EdgeExposes` | Network exposure (UI: "Services" group) | Service → Pod, Route → Revision |
 | `EdgeConfigures` | Configuration | ConfigMap → Deployment, DestinationRule → Service |
 | `EdgeUses` | Scaling relationship | HPA → Deployment |
 | `EdgeProtects` | Policy protection | PDB → Deployment |
@@ -237,6 +237,6 @@ After implementation, verify:
 
 5. **Two-phase topology pattern:** Store resources in slices during node creation (phase 1), reuse during edge creation (phase 2). Don't call `dynamicCache.List()` twice for the same kind.
 
-6. **Edge type choice matters:** Edge types drive the "Related Resources" grouping in the detail drawer. `EdgeExposes` creates a "Network" group, `EdgeManages` creates "Children", `EdgeConfigures` creates "Configuration", etc. Choose semantically, not by code convenience.
+6. **Edge type choice matters:** Edge types drive the "Related Resources" grouping in the detail drawer. `EdgeExposes` creates a "Services" group, `EdgeManages` creates "Children", `EdgeConfigures` creates "Configuration", etc. Choose semantically, not by code convenience.
 
 7. **CSS topology icon classes** must use the lowercase kind name: `.topology-icon-knativeservice`, not `.topology-icon-KnativeService`.

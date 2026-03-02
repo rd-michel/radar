@@ -1,7 +1,7 @@
 import { Settings, Container } from 'lucide-react'
 import { clsx } from 'clsx'
-import { Section, PropertyList, Property, ConditionsSection, AlertBanner, ResourceLink } from '../drawer-components'
-import { getConfigurationStatus } from '../resource-utils-knative'
+import { Section, PropertyList, Property, ConditionsSection, KnativeNotReadyBanner, ResourceLink } from '../drawer-components'
+import { getKnativeConditionStatus } from '../resource-utils-knative'
 
 interface KnativeConfigurationRendererProps {
   data: any
@@ -9,7 +9,7 @@ interface KnativeConfigurationRendererProps {
 }
 
 export function KnativeConfigurationRenderer({ data, onNavigate }: KnativeConfigurationRendererProps) {
-  const status = getConfigurationStatus(data)
+  const status = getKnativeConditionStatus(data)
   const ns = data.metadata?.namespace || ''
 
   const latestCreated = data.status?.latestCreatedRevisionName
@@ -18,13 +18,7 @@ export function KnativeConfigurationRenderer({ data, onNavigate }: KnativeConfig
 
   return (
     <>
-      {status.level === 'unhealthy' && (
-        <AlertBanner
-          variant="error"
-          title="Configuration Not Ready"
-          message={(data.status?.conditions || []).find((c: any) => c.type === 'Ready')?.message || 'This configuration is not in a ready state.'}
-        />
-      )}
+      <KnativeNotReadyBanner status={status} data={data} resourceType="Configuration" />
 
       <Section title="Overview" icon={Settings} defaultExpanded>
         <PropertyList>
