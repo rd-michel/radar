@@ -874,6 +874,7 @@ export interface PrometheusResourceMetrics {
   unit: string
   range: string
   result: PrometheusQueryResult
+  query?: string // PromQL query (included when result is empty, for diagnostics)
 }
 
 export type PrometheusMetricCategory = 'cpu' | 'memory' | 'network_rx' | 'network_tx' | 'filesystem'
@@ -2117,6 +2118,13 @@ export interface DiagDropRecord {
   time: string
 }
 
+export interface DiagErrorEntry {
+  time: string
+  source: string
+  message: string
+  level: string
+}
+
 export interface DiagnosticsSnapshot {
   timestamp: string
   radarVersion: string
@@ -2217,6 +2225,7 @@ export interface DiagnosticsSnapshot {
     mcpEnabled: boolean
     hasPrometheusURL: boolean
   }
+  recentErrors?: DiagErrorEntry[]
   errors?: string[]
 }
 

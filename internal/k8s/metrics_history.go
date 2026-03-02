@@ -8,6 +8,8 @@ import (
 	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
+	"github.com/skyhook-io/radar/internal/errorlog"
 )
 
 const (
@@ -226,6 +228,7 @@ func (s *MetricsHistoryStore) collectPodMetrics(ctx context.Context, now time.Ti
 		s.lastPodError = "dynamic client not initialized"
 		if s.consecutivePodErrors == 1 || s.consecutivePodErrors%20 == 0 {
 			log.Printf("[metrics] Pod metrics collection failed (count=%d): %s", s.consecutivePodErrors, s.lastPodError)
+			errorlog.Record("metrics", "error", "pod metrics collection failed (count=%d): %s", s.consecutivePodErrors, s.lastPodError)
 		}
 		s.mu.Unlock()
 		return
@@ -240,6 +243,7 @@ func (s *MetricsHistoryStore) collectPodMetrics(ctx context.Context, now time.Ti
 		// Log on first failure, then every 20th to avoid spam (every ~10 minutes at 30s intervals)
 		if s.consecutivePodErrors == 1 || s.consecutivePodErrors%20 == 0 {
 			log.Printf("[metrics] Pod metrics collection failed (count=%d): %v", s.consecutivePodErrors, err)
+			errorlog.Record("metrics", "error", "pod metrics collection failed (count=%d): %v", s.consecutivePodErrors, err)
 		}
 		s.mu.Unlock()
 		return
@@ -335,6 +339,7 @@ func (s *MetricsHistoryStore) collectNodeMetrics(ctx context.Context, now time.T
 		s.lastNodeError = "dynamic client not initialized"
 		if s.consecutiveNodeErrors == 1 || s.consecutiveNodeErrors%20 == 0 {
 			log.Printf("[metrics] Node metrics collection failed (count=%d): %s", s.consecutiveNodeErrors, s.lastNodeError)
+			errorlog.Record("metrics", "error", "node metrics collection failed (count=%d): %s", s.consecutiveNodeErrors, s.lastNodeError)
 		}
 		s.mu.Unlock()
 		return
@@ -348,6 +353,7 @@ func (s *MetricsHistoryStore) collectNodeMetrics(ctx context.Context, now time.T
 		s.lastNodeError = err.Error()
 		if s.consecutiveNodeErrors == 1 || s.consecutiveNodeErrors%20 == 0 {
 			log.Printf("[metrics] Node metrics collection failed (count=%d): %v", s.consecutiveNodeErrors, err)
+			errorlog.Record("metrics", "error", "node metrics collection failed (count=%d): %v", s.consecutiveNodeErrors, err)
 		}
 		s.mu.Unlock()
 		return
