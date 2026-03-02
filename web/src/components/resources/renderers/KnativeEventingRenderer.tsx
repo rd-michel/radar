@@ -1,12 +1,7 @@
 import { Radio, Filter, FileType, Inbox, ArrowRightLeft } from 'lucide-react'
 import { clsx } from 'clsx'
-import { Section, PropertyList, Property, ConditionsSection, AlertBanner, ResourceLink } from '../drawer-components'
-import {
-  getBrokerStatus,
-  getTriggerStatus,
-  getChannelStatus,
-  getSubscriptionStatus,
-} from '../resource-utils-knative'
+import { Section, PropertyList, Property, ConditionsSection, KnativeNotReadyBanner, ResourceLink } from '../drawer-components'
+import { getKnativeConditionStatus } from '../resource-utils-knative'
 
 interface RendererProps {
   data: any
@@ -18,7 +13,7 @@ interface RendererProps {
 // ============================================================================
 
 export function BrokerRenderer({ data, onNavigate }: RendererProps) {
-  const status = getBrokerStatus(data)
+  const status = getKnativeConditionStatus(data)
   const ns = data.metadata?.namespace || ''
   const address = data.status?.address?.url
   const delivery = data.spec?.delivery
@@ -27,13 +22,7 @@ export function BrokerRenderer({ data, onNavigate }: RendererProps) {
 
   return (
     <>
-      {status.level === 'unhealthy' && (
-        <AlertBanner
-          variant="error"
-          title="Broker Not Ready"
-          message={(data.status?.conditions || []).find((c: any) => c.type === 'Ready')?.message || 'This broker is not in a ready state.'}
-        />
-      )}
+      <KnativeNotReadyBanner status={status} data={data} resourceType="Broker" />
 
       <Section title="Overview" icon={Radio} defaultExpanded>
         <PropertyList>
@@ -85,7 +74,7 @@ export function BrokerRenderer({ data, onNavigate }: RendererProps) {
 // ============================================================================
 
 export function TriggerRenderer({ data, onNavigate }: RendererProps) {
-  const status = getTriggerStatus(data)
+  const status = getKnativeConditionStatus(data)
   const ns = data.metadata?.namespace || ''
   const spec = data.spec || {}
   const brokerName = spec.broker || 'default'
@@ -96,13 +85,7 @@ export function TriggerRenderer({ data, onNavigate }: RendererProps) {
 
   return (
     <>
-      {status.level === 'unhealthy' && (
-        <AlertBanner
-          variant="error"
-          title="Trigger Not Ready"
-          message={(data.status?.conditions || []).find((c: any) => c.type === 'Ready')?.message || 'This trigger is not in a ready state.'}
-        />
-      )}
+      <KnativeNotReadyBanner status={status} data={data} resourceType="Trigger" />
 
       <Section title="Overview" icon={Filter} defaultExpanded>
         <PropertyList>
@@ -181,19 +164,13 @@ export function EventTypeRenderer({ data }: RendererProps) {
 // ============================================================================
 
 export function ChannelRenderer({ data }: RendererProps) {
-  const status = getChannelStatus(data)
+  const status = getKnativeConditionStatus(data)
   const address = data.status?.address?.url
   const subscribers = data.status?.subscribers || []
 
   return (
     <>
-      {status.level === 'unhealthy' && (
-        <AlertBanner
-          variant="error"
-          title="Channel Not Ready"
-          message={(data.status?.conditions || []).find((c: any) => c.type === 'Ready')?.message || 'This channel is not in a ready state.'}
-        />
-      )}
+      <KnativeNotReadyBanner status={status} data={data} resourceType="Channel" />
 
       <Section title="Overview" icon={Inbox} defaultExpanded>
         <PropertyList>
@@ -245,7 +222,7 @@ export function InMemoryChannelRenderer({ data, onNavigate }: RendererProps) {
 // ============================================================================
 
 export function SubscriptionRenderer({ data, onNavigate }: RendererProps) {
-  const status = getSubscriptionStatus(data)
+  const status = getKnativeConditionStatus(data)
   const ns = data.metadata?.namespace || ''
   const spec = data.spec || {}
 
@@ -258,13 +235,7 @@ export function SubscriptionRenderer({ data, onNavigate }: RendererProps) {
 
   return (
     <>
-      {status.level === 'unhealthy' && (
-        <AlertBanner
-          variant="error"
-          title="Subscription Not Ready"
-          message={(data.status?.conditions || []).find((c: any) => c.type === 'Ready')?.message || 'This subscription is not in a ready state.'}
-        />
-      )}
+      <KnativeNotReadyBanner status={status} data={data} resourceType="Subscription" />
 
       <Section title="Overview" icon={ArrowRightLeft} defaultExpanded>
         <PropertyList>

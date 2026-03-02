@@ -1,7 +1,7 @@
 import { Route } from 'lucide-react'
 import { clsx } from 'clsx'
-import { Section, PropertyList, Property, ConditionsSection, AlertBanner, ResourceLink } from '../drawer-components'
-import { getRouteStatus } from '../resource-utils-knative'
+import { Section, PropertyList, Property, ConditionsSection, KnativeNotReadyBanner, ResourceLink } from '../drawer-components'
+import { getKnativeConditionStatus } from '../resource-utils-knative'
 
 interface KnativeRouteRendererProps {
   data: any
@@ -9,20 +9,14 @@ interface KnativeRouteRendererProps {
 }
 
 export function KnativeRouteRenderer({ data, onNavigate }: KnativeRouteRendererProps) {
-  const status = getRouteStatus(data)
+  const status = getKnativeConditionStatus(data)
   const traffic = data.status?.traffic || data.spec?.traffic || []
   const ns = data.metadata?.namespace || ''
   const url = data.status?.url || data.status?.address?.url
 
   return (
     <>
-      {status.level === 'unhealthy' && (
-        <AlertBanner
-          variant="error"
-          title="Route Not Ready"
-          message={(data.status?.conditions || []).find((c: any) => c.type === 'Ready')?.message || 'This route is not in a ready state.'}
-        />
-      )}
+      <KnativeNotReadyBanner status={status} data={data} resourceType="Route" />
 
       <Section title="Overview" icon={Route} defaultExpanded>
         <PropertyList>

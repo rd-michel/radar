@@ -7,7 +7,7 @@ import { healthColors } from './resource-utils'
 // SHARED HELPERS
 // ============================================================================
 
-function getKnativeConditionStatus(resource: any): StatusBadge {
+export function getKnativeConditionStatus(resource: any): StatusBadge {
   const conditions = resource?.status?.conditions || []
   const ready = conditions.find((c: any) => c.type === 'Ready')
   if (!ready) return { text: 'Unknown', color: healthColors.unknown, level: 'unknown' }
@@ -36,10 +36,6 @@ function formatRef(ref: any): string {
 // ============================================================================
 // KNATIVE SERVICE (serving.knative.dev/v1)
 // ============================================================================
-
-export function getKnativeServiceStatus(resource: any): StatusBadge {
-  return getKnativeConditionStatus(resource)
-}
 
 export function getKnativeServiceUrl(resource: any): string {
   return resource?.status?.url || '-'
@@ -94,10 +90,6 @@ export function getRevisionConcurrency(resource: any): string {
 // ROUTE (serving.knative.dev/v1)
 // ============================================================================
 
-export function getRouteStatus(resource: any): StatusBadge {
-  return getKnativeConditionStatus(resource)
-}
-
 export function getRouteUrl(resource: any): string {
   return resource?.status?.url || '-'
 }
@@ -109,10 +101,6 @@ export function getRouteTraffic(resource: any): string {
 // ============================================================================
 // CONFIGURATION (serving.knative.dev/v1)
 // ============================================================================
-
-export function getConfigurationStatus(resource: any): StatusBadge {
-  return getKnativeConditionStatus(resource)
-}
 
 export function getConfigurationLatestCreated(resource: any): string {
   return resource?.status?.latestCreatedRevisionName || '-'
@@ -126,10 +114,6 @@ export function getConfigurationLatestReady(resource: any): string {
 // BROKER (eventing.knative.dev/v1)
 // ============================================================================
 
-export function getBrokerStatus(resource: any): StatusBadge {
-  return getKnativeConditionStatus(resource)
-}
-
 export function getBrokerAddress(resource: any): string {
   return resource?.status?.address?.url || '-'
 }
@@ -137,10 +121,6 @@ export function getBrokerAddress(resource: any): string {
 // ============================================================================
 // TRIGGER (eventing.knative.dev/v1)
 // ============================================================================
-
-export function getTriggerStatus(resource: any): StatusBadge {
-  return getKnativeConditionStatus(resource)
-}
 
 export function getTriggerBroker(resource: any): string {
   return resource?.spec?.broker || '-'
@@ -164,10 +144,6 @@ export function getTriggerFilter(resource: any): string {
 // SOURCES (sources.knative.dev/v1)
 // ============================================================================
 
-export function getSourceStatus(resource: any): StatusBadge {
-  return getKnativeConditionStatus(resource)
-}
-
 export function getSourceSink(resource: any): string {
   const ref = resource?.spec?.sink?.ref
   if (ref) return formatRef(ref)
@@ -189,10 +165,6 @@ export function getPingSourceData(resource: any): string {
 // CHANNEL (messaging.knative.dev/v1)
 // ============================================================================
 
-export function getChannelStatus(resource: any): StatusBadge {
-  return getKnativeConditionStatus(resource)
-}
-
 export function getChannelAddress(resource: any): string {
   return resource?.status?.address?.url || '-'
 }
@@ -200,10 +172,6 @@ export function getChannelAddress(resource: any): string {
 // ============================================================================
 // SUBSCRIPTION (messaging.knative.dev/v1)
 // ============================================================================
-
-export function getSubscriptionStatus(resource: any): StatusBadge {
-  return getKnativeConditionStatus(resource)
-}
 
 export function getSubscriptionChannel(resource: any): string {
   const channel = resource?.spec?.channel
@@ -221,10 +189,6 @@ export function getSubscriptionSubscriber(resource: any): string {
 // SEQUENCE (flows.knative.dev/v1)
 // ============================================================================
 
-export function getSequenceStatus(resource: any): StatusBadge {
-  return getKnativeConditionStatus(resource)
-}
-
 export function getSequenceStepCount(resource: any): number {
   return (resource?.spec?.steps || []).length
 }
@@ -232,10 +196,6 @@ export function getSequenceStepCount(resource: any): number {
 // ============================================================================
 // PARALLEL (flows.knative.dev/v1)
 // ============================================================================
-
-export function getParallelStatus(resource: any): StatusBadge {
-  return getKnativeConditionStatus(resource)
-}
 
 export function getParallelBranchCount(resource: any): number {
   return (resource?.spec?.branches || []).length
@@ -245,37 +205,13 @@ export function getParallelBranchCount(resource: any): number {
 // DOMAINMAPPING (serving.knative.dev/v1beta1)
 // ============================================================================
 
-export function getDomainMappingStatus(resource: any): StatusBadge {
-  return getKnativeConditionStatus(resource)
-}
-
 export function getDomainMappingUrl(resource: any): string {
   return resource?.status?.url || '-'
 }
 
 // ============================================================================
-// KNATIVE INGRESS (networking.internal.knative.dev/v1alpha1)
-// ============================================================================
-
-export function getKnativeIngressStatus(resource: any): StatusBadge {
-  return getKnativeConditionStatus(resource)
-}
-
-// ============================================================================
-// KNATIVE CERTIFICATE (networking.internal.knative.dev/v1alpha1)
-// ============================================================================
-
-export function getKnativeCertificateStatus(resource: any): StatusBadge {
-  return getKnativeConditionStatus(resource)
-}
-
-// ============================================================================
 // SERVERLESSSERVICE (networking.internal.knative.dev/v1alpha1)
 // ============================================================================
-
-export function getServerlessServiceStatus(resource: any): StatusBadge {
-  return getKnativeConditionStatus(resource)
-}
 
 export function getServerlessServiceMode(resource: any): string {
   return resource?.spec?.mode || '-'

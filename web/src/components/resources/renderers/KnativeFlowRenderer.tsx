@@ -1,7 +1,7 @@
 import { ListOrdered, GitFork } from 'lucide-react'
 import { clsx } from 'clsx'
-import { Section, PropertyList, Property, ConditionsSection, AlertBanner, ResourceLink } from '../drawer-components'
-import { getSequenceStatus, getParallelStatus } from '../resource-utils-knative'
+import { Section, PropertyList, Property, ConditionsSection, KnativeNotReadyBanner, ResourceLink } from '../drawer-components'
+import { getKnativeConditionStatus } from '../resource-utils-knative'
 
 interface RendererProps {
   data: any
@@ -34,7 +34,7 @@ function RefDisplay({ ref: destRef, ns, onNavigate }: { ref: any; ns: string; on
 // ============================================================================
 
 export function SequenceRenderer({ data, onNavigate }: RendererProps) {
-  const status = getSequenceStatus(data)
+  const status = getKnativeConditionStatus(data)
   const ns = data.metadata?.namespace || ''
   const spec = data.spec || {}
   const steps = spec.steps || []
@@ -42,13 +42,7 @@ export function SequenceRenderer({ data, onNavigate }: RendererProps) {
 
   return (
     <>
-      {status.level === 'unhealthy' && (
-        <AlertBanner
-          variant="error"
-          title="Sequence Not Ready"
-          message={(data.status?.conditions || []).find((c: any) => c.type === 'Ready')?.message || 'This Sequence is not in a ready state.'}
-        />
-      )}
+      <KnativeNotReadyBanner status={status} data={data} resourceType="Sequence" />
 
       <Section title="Overview" icon={ListOrdered} defaultExpanded>
         <PropertyList>
@@ -89,7 +83,7 @@ export function SequenceRenderer({ data, onNavigate }: RendererProps) {
 // ============================================================================
 
 export function ParallelRenderer({ data, onNavigate }: RendererProps) {
-  const status = getParallelStatus(data)
+  const status = getKnativeConditionStatus(data)
   const ns = data.metadata?.namespace || ''
   const spec = data.spec || {}
   const branches = spec.branches || []
@@ -97,13 +91,7 @@ export function ParallelRenderer({ data, onNavigate }: RendererProps) {
 
   return (
     <>
-      {status.level === 'unhealthy' && (
-        <AlertBanner
-          variant="error"
-          title="Parallel Not Ready"
-          message={(data.status?.conditions || []).find((c: any) => c.type === 'Ready')?.message || 'This Parallel is not in a ready state.'}
-        />
-      )}
+      <KnativeNotReadyBanner status={status} data={data} resourceType="Parallel" />
 
       <Section title="Overview" icon={GitFork} defaultExpanded>
         <PropertyList>
