@@ -1,7 +1,7 @@
 import { Clock, Server, Container, Link2 } from 'lucide-react'
 import { clsx } from 'clsx'
-import { Section, PropertyList, Property, ConditionsSection, AlertBanner, ResourceLink } from '../drawer-components'
-import { getSourceStatus } from '../resource-utils-knative'
+import { Section, PropertyList, Property, ConditionsSection, KnativeNotReadyBanner, ResourceLink } from '../drawer-components'
+import { getKnativeConditionStatus } from '../resource-utils-knative'
 
 interface RendererProps {
   data: any
@@ -38,19 +38,13 @@ function SinkProperty({ sink, ns, onNavigate }: { sink: any; ns: string; onNavig
 // ============================================================================
 
 export function PingSourceRenderer({ data, onNavigate }: RendererProps) {
-  const status = getSourceStatus(data)
+  const status = getKnativeConditionStatus(data)
   const ns = data.metadata?.namespace || ''
   const spec = data.spec || {}
 
   return (
     <>
-      {status.level === 'unhealthy' && (
-        <AlertBanner
-          variant="error"
-          title="PingSource Not Ready"
-          message={(data.status?.conditions || []).find((c: any) => c.type === 'Ready')?.message || 'This PingSource is not in a ready state.'}
-        />
-      )}
+      <KnativeNotReadyBanner status={status} data={data} resourceType="PingSource" />
 
       <Section title="Overview" icon={Clock} defaultExpanded>
         <PropertyList>
@@ -79,20 +73,14 @@ export function PingSourceRenderer({ data, onNavigate }: RendererProps) {
 // ============================================================================
 
 export function ApiServerSourceRenderer({ data, onNavigate }: RendererProps) {
-  const status = getSourceStatus(data)
+  const status = getKnativeConditionStatus(data)
   const ns = data.metadata?.namespace || ''
   const spec = data.spec || {}
   const resources = spec.resources || []
 
   return (
     <>
-      {status.level === 'unhealthy' && (
-        <AlertBanner
-          variant="error"
-          title="ApiServerSource Not Ready"
-          message={(data.status?.conditions || []).find((c: any) => c.type === 'Ready')?.message || 'This ApiServerSource is not in a ready state.'}
-        />
-      )}
+      <KnativeNotReadyBanner status={status} data={data} resourceType="ApiServerSource" />
 
       <Section title="Overview" icon={Server} defaultExpanded>
         <PropertyList>
@@ -134,7 +122,7 @@ export function ApiServerSourceRenderer({ data, onNavigate }: RendererProps) {
 // ============================================================================
 
 export function ContainerSourceRenderer({ data, onNavigate }: RendererProps) {
-  const status = getSourceStatus(data)
+  const status = getKnativeConditionStatus(data)
   const ns = data.metadata?.namespace || ''
   const spec = data.spec || {}
   const template = spec.template?.spec || {}
@@ -142,13 +130,7 @@ export function ContainerSourceRenderer({ data, onNavigate }: RendererProps) {
 
   return (
     <>
-      {status.level === 'unhealthy' && (
-        <AlertBanner
-          variant="error"
-          title="ContainerSource Not Ready"
-          message={(data.status?.conditions || []).find((c: any) => c.type === 'Ready')?.message || 'This ContainerSource is not in a ready state.'}
-        />
-      )}
+      <KnativeNotReadyBanner status={status} data={data} resourceType="ContainerSource" />
 
       <Section title="Overview" icon={Container} defaultExpanded>
         <PropertyList>
@@ -189,20 +171,14 @@ export function ContainerSourceRenderer({ data, onNavigate }: RendererProps) {
 // ============================================================================
 
 export function SinkBindingRenderer({ data, onNavigate }: RendererProps) {
-  const status = getSourceStatus(data)
+  const status = getKnativeConditionStatus(data)
   const ns = data.metadata?.namespace || ''
   const spec = data.spec || {}
   const subjectRef = spec.subject
 
   return (
     <>
-      {status.level === 'unhealthy' && (
-        <AlertBanner
-          variant="error"
-          title="SinkBinding Not Ready"
-          message={(data.status?.conditions || []).find((c: any) => c.type === 'Ready')?.message || 'This SinkBinding is not in a ready state.'}
-        />
-      )}
+      <KnativeNotReadyBanner status={status} data={data} resourceType="SinkBinding" />
 
       <Section title="Overview" icon={Link2} defaultExpanded>
         <PropertyList>

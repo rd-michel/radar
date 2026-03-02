@@ -1,12 +1,7 @@
 import { Network, ShieldCheck, Server, Globe } from 'lucide-react'
 import { clsx } from 'clsx'
-import { Section, PropertyList, Property, ConditionsSection, AlertBanner, ResourceLink } from '../drawer-components'
-import {
-  getKnativeIngressStatus,
-  getKnativeCertificateStatus,
-  getServerlessServiceStatus,
-  getDomainMappingStatus,
-} from '../resource-utils-knative'
+import { Section, PropertyList, Property, ConditionsSection, KnativeNotReadyBanner, ResourceLink } from '../drawer-components'
+import { getKnativeConditionStatus } from '../resource-utils-knative'
 
 interface RendererProps {
   data: any
@@ -18,7 +13,7 @@ interface RendererProps {
 // ============================================================================
 
 export function KnativeIngressRenderer({ data }: RendererProps) {
-  const status = getKnativeIngressStatus(data)
+  const status = getKnativeConditionStatus(data)
   const spec = data.spec || {}
   const rules = spec.rules || []
   const ingressClass = data.metadata?.annotations?.['networking.knative.dev/ingress.class']
@@ -26,13 +21,7 @@ export function KnativeIngressRenderer({ data }: RendererProps) {
 
   return (
     <>
-      {status.level === 'unhealthy' && (
-        <AlertBanner
-          variant="error"
-          title="Ingress Not Ready"
-          message={(data.status?.conditions || []).find((c: any) => c.type === 'Ready')?.message || 'This KNative Ingress is not in a ready state.'}
-        />
-      )}
+      <KnativeNotReadyBanner status={status} data={data} resourceType="Ingress" />
 
       <Section title="Overview" icon={Network} defaultExpanded>
         <PropertyList>
@@ -102,20 +91,14 @@ export function KnativeIngressRenderer({ data }: RendererProps) {
 // ============================================================================
 
 export function KnativeCertificateRenderer({ data }: RendererProps) {
-  const status = getKnativeCertificateStatus(data)
+  const status = getKnativeConditionStatus(data)
   const spec = data.spec || {}
   const dnsNames = spec.dnsNames || []
   const secretName = spec.secretName || data.status?.http01Challenges?.[0]?.secretName
 
   return (
     <>
-      {status.level === 'unhealthy' && (
-        <AlertBanner
-          variant="error"
-          title="Certificate Not Ready"
-          message={(data.status?.conditions || []).find((c: any) => c.type === 'Ready')?.message || 'This certificate is not in a ready state.'}
-        />
-      )}
+      <KnativeNotReadyBanner status={status} data={data} resourceType="Certificate" />
 
       <Section title="Overview" icon={ShieldCheck} defaultExpanded>
         <PropertyList>
@@ -151,7 +134,7 @@ export function KnativeCertificateRenderer({ data }: RendererProps) {
 // ============================================================================
 
 export function ServerlessServiceRenderer({ data, onNavigate }: RendererProps) {
-  const status = getServerlessServiceStatus(data)
+  const status = getKnativeConditionStatus(data)
   const ns = data.metadata?.namespace || ''
   const spec = data.spec || {}
   const mode = spec.mode
@@ -163,13 +146,7 @@ export function ServerlessServiceRenderer({ data, onNavigate }: RendererProps) {
 
   return (
     <>
-      {status.level === 'unhealthy' && (
-        <AlertBanner
-          variant="error"
-          title="ServerlessService Not Ready"
-          message={(data.status?.conditions || []).find((c: any) => c.type === 'Ready')?.message || 'This ServerlessService is not in a ready state.'}
-        />
-      )}
+      <KnativeNotReadyBanner status={status} data={data} resourceType="ServerlessService" />
 
       <Section title="Overview" icon={Server} defaultExpanded>
         <PropertyList>
@@ -213,7 +190,7 @@ export function ServerlessServiceRenderer({ data, onNavigate }: RendererProps) {
 // ============================================================================
 
 export function DomainMappingRenderer({ data, onNavigate }: RendererProps) {
-  const status = getDomainMappingStatus(data)
+  const status = getKnativeConditionStatus(data)
   const ns = data.metadata?.namespace || ''
   const url = data.status?.url
   const ref = data.spec?.ref
@@ -221,13 +198,7 @@ export function DomainMappingRenderer({ data, onNavigate }: RendererProps) {
 
   return (
     <>
-      {status.level === 'unhealthy' && (
-        <AlertBanner
-          variant="error"
-          title="DomainMapping Not Ready"
-          message={(data.status?.conditions || []).find((c: any) => c.type === 'Ready')?.message || 'This DomainMapping is not in a ready state.'}
-        />
-      )}
+      <KnativeNotReadyBanner status={status} data={data} resourceType="DomainMapping" />
 
       <Section title="Overview" icon={Globe} defaultExpanded>
         <PropertyList>

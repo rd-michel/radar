@@ -1,7 +1,7 @@
 import { Globe, Layers, Container } from 'lucide-react'
 import { clsx } from 'clsx'
-import { Section, PropertyList, Property, ConditionsSection, AlertBanner, ResourceLink } from '../drawer-components'
-import { getKnativeServiceStatus } from '../resource-utils-knative'
+import { Section, PropertyList, Property, ConditionsSection, KnativeNotReadyBanner, ResourceLink } from '../drawer-components'
+import { getKnativeConditionStatus } from '../resource-utils-knative'
 
 interface KnativeServiceRendererProps {
   data: any
@@ -9,7 +9,7 @@ interface KnativeServiceRendererProps {
 }
 
 export function KnativeServiceRenderer({ data, onNavigate }: KnativeServiceRendererProps) {
-  const status = getKnativeServiceStatus(data)
+  const status = getKnativeConditionStatus(data)
   const ns = data.metadata?.namespace || ''
   const url = data.status?.url
   const traffic = data.status?.traffic || []
@@ -27,18 +27,9 @@ export function KnativeServiceRenderer({ data, onNavigate }: KnativeServiceRende
   const concurrency = templateSpec.containerConcurrency
   const timeoutSeconds = templateSpec.timeoutSeconds
 
-  const readyCond = (data.status?.conditions || []).find((c: any) => c.type === 'Ready')
-  const notReadyMessage = readyCond?.status === 'False' ? readyCond.message : undefined
-
   return (
     <>
-      {status.level === 'unhealthy' && (
-        <AlertBanner
-          variant="error"
-          title="Service Not Ready"
-          message={notReadyMessage || 'The KNative Service is not in a ready state.'}
-        />
-      )}
+      <KnativeNotReadyBanner status={status} data={data} resourceType="Service" />
 
       <Section title="Overview" icon={Globe} defaultExpanded>
         <PropertyList>

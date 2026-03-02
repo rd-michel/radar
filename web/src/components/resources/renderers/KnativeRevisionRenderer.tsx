@@ -1,6 +1,6 @@
 import { Container, Settings } from 'lucide-react'
 import { clsx } from 'clsx'
-import { Section, PropertyList, Property, ConditionsSection, AlertBanner } from '../drawer-components'
+import { Section, PropertyList, Property, ConditionsSection, KnativeNotReadyBanner } from '../drawer-components'
 import { getRevisionStatus } from '../resource-utils-knative'
 
 interface KnativeRevisionRendererProps {
@@ -27,13 +27,7 @@ export function KnativeRevisionRenderer({ data }: KnativeRevisionRendererProps) 
 
   return (
     <>
-      {status.level === 'unhealthy' && (
-        <AlertBanner
-          variant="error"
-          title="Revision Not Ready"
-          message={(data.status?.conditions || []).find((c: any) => c.type === 'Ready')?.message || 'This revision is not in a ready state.'}
-        />
-      )}
+      <KnativeNotReadyBanner status={status} data={data} resourceType="Revision" />
 
       <Section title="Overview" icon={Settings} defaultExpanded>
         <PropertyList>

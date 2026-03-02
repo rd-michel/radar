@@ -219,6 +219,14 @@ export function AlertBanner({ variant, icon, title, message, items, children }: 
   )
 }
 
+/** KNative "Not Ready" alert banner — shared across all KNative renderers */
+export function KnativeNotReadyBanner({ status, data, resourceType }: { status: { level: string }; data: any; resourceType: string }) {
+  if (status.level !== 'unhealthy') return null
+  const message = (data.status?.conditions || []).find((c: any) => c.type === 'Ready')?.message
+    || `This ${resourceType} is not in a ready state.`
+  return <AlertBanner variant="error" title={`${resourceType} Not Ready`} message={message} />
+}
+
 /** Problem type for ProblemAlerts component */
 export interface Problem {
   color: 'red' | 'yellow'
