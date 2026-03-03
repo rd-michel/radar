@@ -530,7 +530,7 @@ function InfoStep({
             <option key={ns.name} value={ns.name} />
           ))}
         </datalist>
-        <label className="flex items-center gap-2 mt-2 text-sm text-theme-text-secondary cursor-pointer">
+        <label className="flex items-center gap-2 mt-2 text-sm text-theme-text-secondary">
           <input
             type="checkbox"
             checked={createNamespace}

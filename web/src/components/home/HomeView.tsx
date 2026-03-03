@@ -138,7 +138,7 @@ function ProblemsPanel({ problems, onResourceClick }: ProblemsPanelProps) {
           {problems.map((p, i) => (
             <button
               key={`${p.kind}-${p.namespace}-${p.name}-${i}`}
-              className="w-full flex items-center gap-2 px-3 py-1.5 hover:bg-theme-hover transition-colors text-left cursor-pointer"
+              className="w-full flex items-center gap-2 px-3 py-1.5 hover:bg-theme-hover transition-colors text-left"
               onClick={() => onResourceClick({
                 kind: kindToPlural(p.kind),
                 namespace: p.namespace,

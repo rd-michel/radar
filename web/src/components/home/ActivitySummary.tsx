@@ -110,7 +110,7 @@ export function ActivitySummary({ namespaces, topology, onNavigate }: ActivitySu
   return (
     <button
       onClick={onNavigate}
-      className="group h-[260px] rounded-lg border-[3px] border-blue-500/30 bg-theme-surface/50 hover:-translate-y-1 hover:shadow-[0_12px_24px_rgba(0,0,0,0.12)] hover:border-blue-500/60 transition-all duration-200 text-left cursor-pointer"
+      className="group h-[260px] rounded-lg border-[3px] border-blue-500/30 bg-theme-surface/50 hover:-translate-y-1 hover:shadow-[0_12px_24px_rgba(0,0,0,0.12)] hover:border-blue-500/60 transition-all duration-200 text-left"
     >
       <div className="flex flex-col h-full w-full">
       <div className="flex items-center justify-between px-4 py-2 border-b border-theme-border">

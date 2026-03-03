@@ -11,7 +11,7 @@ import { TimelineView } from './components/timeline/TimelineView'
 import { ResourcesView } from './components/resources/ResourcesView'
 import { serializeColumnFilters } from './components/resources/resource-utils'
 import { ResourceDetailDrawer } from './components/resources/ResourceDetailDrawer'
-import { ResourceDetailPage } from './components/resource/ResourceDetailPage'
+import { WorkloadViewRoute } from './components/workload/WorkloadView'
 import { HelmView } from './components/helm/HelmView'
 import { TrafficView } from './components/traffic/TrafficView'
 import { CostView } from './components/cost/CostView'
@@ -79,22 +79,8 @@ function apiResourceToNodeIdPrefix(apiResource: string): string {
   return prefixMap[apiResource] || apiResource.replace(/s$/, '')
 }
 
-// Parse resource param from URL (format: "Kind/namespace/name")
-function parseResourceParam(param: string | null): SelectedResource | null {
-  if (!param) return null
-  const parts = param.split('/')
-  if (parts.length < 3) return null
-  const [kind, ns, ...nameParts] = parts
-  return { kind, namespace: ns, name: nameParts.join('/') }
-}
-
-// Encode resource to URL param
-function encodeResourceParam(resource: SelectedResource): string {
-  return `${resource.kind}/${resource.namespace}/${resource.name}`
-}
-
 // Extended MainView type that includes traffic and cost
-type ExtendedMainView = MainView | 'traffic' | 'cost'
+type ExtendedMainView = MainView | 'traffic' | 'cost' | 'workload'
 
 // Extract view from URL path
 function getViewFromPath(pathname: string): ExtendedMainView {
@@ -106,6 +92,7 @@ function getViewFromPath(pathname: string): ExtendedMainView {
   if (path === 'helm') return 'helm'
   if (path === 'traffic') return 'traffic'
   if (path === 'cost') return 'cost'
+  if (path === 'workload') return 'workload'
   return 'home'
 }
 
@@ -132,13 +119,11 @@ function AppInner() {
   // Initialize state from URL
   const getInitialState = () => {
     const namespaces = parseNamespacesFromURL(searchParams)
-    const resource = parseResourceParam(searchParams.get('resource'))
     return {
       namespaces,
       topologyMode: (searchParams.get('mode') as 'resources' | 'traffic') || 'resources',
       // Default to namespace grouping when viewing all namespaces
       grouping: (searchParams.get('group') as GroupingMode) || (namespaces.length === 0 ? 'namespace' : 'none'),
-      detailResource: resource,
     }
   }
 
@@ -172,24 +157,6 @@ function AppInner() {
   const [selectedHelmRelease, setSelectedHelmRelease] = useState<SelectedHelmRelease | null>(null)
   const [topologyMode, setTopologyMode] = useState<'resources' | 'traffic'>(getInitialState().topologyMode)
   const [groupingMode, setGroupingMode] = useState<GroupingMode>(getInitialState().grouping)
-  // Resource detail page state (for timeline view drill-down)
-  const [detailResource, setDetailResourceState] = useState<SelectedResource | null>(getInitialState().detailResource)
-
-  // Wrapper to handle detail resource navigation with proper history
-  const setDetailResource = useCallback((resource: SelectedResource | null) => {
-    if (resource) {
-      // Navigating INTO detail view - push new history entry
-      const params = new URLSearchParams(searchParams)
-      params.set('resource', encodeResourceParam(resource))
-      navigate({ pathname: '/timeline', search: params.toString() })
-    } else {
-      // Navigating OUT of detail view - use browser back if possible, or just clear param
-      const params = new URLSearchParams(searchParams)
-      params.delete('resource')
-      navigate({ pathname: '/timeline', search: params.toString() })
-    }
-    setDetailResourceState(resource)
-  }, [navigate, searchParams])
   // Topology filter state
   const [visibleKinds, setVisibleKinds] = useState<Set<NodeKind>>(() => new Set(DEFAULT_VISIBLE_KINDS))
   const [filterSidebarCollapsed, setFilterSidebarCollapsed] = useState(false)
@@ -202,6 +169,12 @@ function AppInner() {
 
   // Diagnostics overlay state
   const [showDiagnostics, setShowDiagnostics] = useState(false)
+
+  // Drawer expanded state (drawer grows to full width and renders WorkloadView)
+  const [drawerExpanded, setDrawerExpanded] = useState(false)
+
+  // Suppress the mainView-change clear effect during controlled expand/collapse transitions.
+  const suppressViewClearRef = useRef(false)
 
   // Animation hooks for smooth mount/unmount transitions
   const resourceDrawer = useAnimatedUnmount(!!selectedResource, 300)
@@ -228,6 +201,13 @@ function AppInner() {
       update()
     }
   }, [selectedResource])
+
+  // Collapse from expanded WorkloadView back to drawer
+  const handleCollapseFromExpanded = useCallback(() => {
+    suppressViewClearRef.current = true
+    setDrawerExpanded(false)
+    navigate(-1)
+  }, [navigate])
 
   // Pending navigation that needs namespace filter confirmation
   const [pendingKindNav, setPendingKindNav] = useState<{ kind: string; group: string } | null>(null)
@@ -338,6 +318,11 @@ function AppInner() {
       queryClient.removeQueries()
       queryClient.invalidateQueries()
 
+      // Close any open drawers/overlays — old cluster's resources don't exist on the new one
+      setSelectedResource(null)
+      setDrawerExpanded(false)
+      setSelectedHelmRelease(null)
+
       // Reset URL to current view with no resource-specific params.
       // Old cluster's selected pod/resource/kind don't exist on the new cluster.
       navigate({ pathname: location.pathname, search: '' }, { replace: true })
@@ -414,9 +399,6 @@ function AppInner() {
       params.delete('group')
     }
 
-    // Note: resource param for timeline detail view is handled by setDetailResource wrapper
-    // to ensure proper history push/pop behavior
-
     // Only update if params actually changed vs current URL
     if (params.toString() !== new URLSearchParams(currentSearch).toString()) {
       setSearchParams(params, { replace: true })
@@ -427,11 +409,8 @@ function AppInner() {
   // Sync state from URL when navigating (back/forward)
   useEffect(() => {
     const urlNamespaces = parseNamespacesFromURL(searchParams)
-    const resource = parseResourceParam(searchParams.get('resource'))
 
     if (urlNamespaces.join(',') !== namespacesKey) setNamespaces(urlNamespaces)
-    // Use raw setter to avoid triggering navigate() again
-    if (JSON.stringify(resource) !== JSON.stringify(detailResource)) setDetailResourceState(resource)
   }, [searchParams])
 
   // Auto-adjust grouping when namespaces change
@@ -447,9 +426,15 @@ function AppInner() {
 
   // Clear resource selection when changing views or namespaces
   // But preserve selectedResource when navigating TO resources view (e.g., from Helm deep link)
-  // And don't clear detailResource if we're navigating to timeline view (could be from URL)
   const prevMainView = useRef(mainView)
   useEffect(() => {
+    // Skip clearing during controlled expand/collapse transitions
+    if (suppressViewClearRef.current) {
+      suppressViewClearRef.current = false
+      prevMainView.current = mainView
+      return
+    }
+
     const navigatingToResources = mainView === 'resources' && prevMainView.current !== 'resources'
     prevMainView.current = mainView
 
@@ -458,16 +443,13 @@ function AppInner() {
       setSelectedResource(null)
     }
     setSelectedHelmRelease(null)
-    // Only clear detailResource when leaving timeline view or changing namespaces
-    if (mainView !== 'timeline') {
-      setDetailResourceState(null)
-    }
+    setDrawerExpanded(false)
   }, [mainView])
 
-  // Clear detail resource when namespaces change (separate effect)
+  // Clear resource selection when namespaces change
   useEffect(() => {
-    setDetailResourceState(null)
     setSelectedResource(null)
+    setDrawerExpanded(false)
     setSelectedHelmRelease(null)
   }, [namespacesKey])
 
@@ -794,7 +776,7 @@ function AppInner() {
                   <select
                     value={groupingMode}
                     onChange={(e) => setGroupingMode(e.target.value as GroupingMode)}
-                    className="appearance-none bg-transparent text-theme-text-primary text-xs focus:outline-none cursor-pointer"
+                    className="appearance-none bg-transparent text-theme-text-primary text-xs focus:outline-none"
                   >
                     {hasNamespaceFilter && (
                       <option value="none" className="bg-theme-surface">No Grouping</option>
@@ -844,25 +826,15 @@ function AppInner() {
         )}
 
         {/* Timeline view */}
-        {mainView === 'timeline' && !detailResource && (
+        {mainView === 'timeline' && (
           <TimelineView
             namespaces={namespaces}
-            onResourceClick={setDetailResource}
+            onResourceClick={(resource) => {
+              navigate(`/workload/${resource.kind}/${resource.namespace}/${resource.name}`)
+            }}
             initialViewMode={(searchParams.get('view') as 'list' | 'swimlane') || undefined}
             initialFilter={(searchParams.get('filter') as 'all' | 'changes' | 'k8s_events' | 'warnings' | 'unhealthy') || undefined}
             initialTimeRange={(searchParams.get('time') as '5m' | '30m' | '1h' | '6h' | '24h' | 'all') || undefined}
-          />
-        )}
-
-        {/* Resource detail page (drill-down from timeline) */}
-        {mainView === 'timeline' && detailResource && (
-          <ResourceDetailPage
-            key={`${detailResource.kind}/${detailResource.namespace}/${detailResource.name}`}
-            kind={detailResource.kind}
-            namespace={detailResource.namespace}
-            name={detailResource.name}
-            onBack={() => setDetailResource(null)}
-            onNavigateToResource={setDetailResource}
           />
         )}
 
@@ -887,17 +859,37 @@ function AppInner() {
           <CostView onBack={() => setMainView('home')} />
         )}
 
+        {/* Workload full view (direct URL only — expand from drawer uses drawer's expanded state) */}
+        {mainView === 'workload' && !drawerExpanded && (
+          <WorkloadViewRoute
+            onNavigateToResource={(resource) => {
+              navigate(`/workload/${resource.kind}/${resource.namespace}/${resource.name}`)
+            }}
+          />
+        )}
+
         </ErrorBoundary>
       </div>}
 
-      {/* Resource detail drawer (shared by topology and resources views) */}
+      {/* Resource detail drawer — stays mounted, expands to full-screen WorkloadView */}
       {resourceDrawer.shouldRender && drawerResource && (
         <ResourceDetailDrawer
           resource={drawerResource}
           initialTab={drawerInitialTab}
           isOpen={resourceDrawer.isOpen}
-          onClose={() => { setSelectedResource(null); setDrawerInitialTab('detail') }}
+          expanded={drawerExpanded}
+          onClose={() => { setSelectedResource(null); setDrawerInitialTab('detail'); setDrawerExpanded(false) }}
           onNavigate={(res) => navigateToResource(res)}
+          onExpand={(res) => {
+            suppressViewClearRef.current = true
+            setDrawerExpanded(true)
+            navigate(`/workload/${res.kind}/${res.namespace}/${res.name}`)
+          }}
+          onCollapse={handleCollapseFromExpanded}
+          onNavigateToResource={(resource) => {
+            setSelectedResource(resource)
+            navigate(`/workload/${resource.kind}/${resource.namespace}/${resource.name}`, { replace: true })
+          }}
         />
       )}
 

@@ -2,7 +2,7 @@
  * Shared resource hierarchy building logic.
  *
  * This module provides utilities for building hierarchical resource lanes from timeline events.
- * It's used by both TimelineSwimlanes (for the main timeline view) and ResourceDetailPage
+ * It's used by both TimelineSwimlanes (for the main timeline view) and WorkloadView
  * (for showing related events in the detail view).
  *
  * The hierarchy is built from:
@@ -366,8 +366,8 @@ export function buildResourceHierarchy(options: HierarchyOptions): ResourceLane[
         }
       }
 
-      // configures/uses: ConfigMap→Deployment (Deployment is parent of ConfigMap)
-      if (edge.type === 'configures' || edge.type === 'uses') {
+      // configures/uses/protects: ConfigMap→Deployment, HPA→Deployment, PDB→Deployment (target is parent)
+      if (edge.type === 'configures' || edge.type === 'uses' || edge.type === 'protects') {
         if (!laneParent.has(sourceLaneId) && sourceExists) {
           if (!targetExists) {
             const parts = targetLaneId.split('/')

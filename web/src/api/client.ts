@@ -523,7 +523,7 @@ export function useNamespaces() {
 }
 
 // Topology (for manual refresh)
-export function useTopology(namespaces: string[], viewMode: string = 'resources') {
+export function useTopology(namespaces: string[], viewMode: string = 'resources', options?: { enabled?: boolean }) {
   const params = new URLSearchParams()
   if (namespaces.length > 0) params.set('namespaces', namespaces.join(','))
   if (viewMode) params.set('view', viewMode)
@@ -533,6 +533,7 @@ export function useTopology(namespaces: string[], viewMode: string = 'resources'
     queryKey: ['topology', namespaces, viewMode],
     queryFn: () => fetchJSON(`/topology${queryString ? `?${queryString}` : ''}`),
     staleTime: 5000, // 5 seconds
+    enabled: options?.enabled !== false,
   })
 }
 
@@ -597,6 +598,7 @@ export interface UseChangesOptions {
   includeK8sEvents?: boolean
   includeManaged?: boolean
   limit?: number
+  enabled?: boolean
 }
 
 function getTimeRangeDate(range: TimeRange): Date | null {
@@ -619,7 +621,7 @@ function getTimeRangeDate(range: TimeRange): Date | null {
 }
 
 export function useChanges(options: UseChangesOptions = {}) {
-  const { namespaces = [], kind, timeRange = '1h', filter = 'all', includeK8sEvents = true, includeManaged = false, limit = 200 } = options
+  const { namespaces = [], kind, timeRange = '1h', filter = 'all', includeK8sEvents = true, includeManaged = false, limit = 200, enabled = true } = options
 
   const params = new URLSearchParams()
   if (namespaces.length > 0) params.set('namespaces', namespaces.join(','))
@@ -641,6 +643,7 @@ export function useChanges(options: UseChangesOptions = {}) {
     queryFn: () => fetchJSON(`/changes${queryString ? `?${queryString}` : ''}`),
     staleTime: 5000, // Consider data stale after 5 seconds to ensure fresh data on navigation
     refetchInterval: 60000, // SSE handles real-time updates; this is a fallback
+    enabled,
   })
 }
 

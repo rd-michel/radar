@@ -573,7 +573,7 @@ export function TopologyGraph({
                     : 'Some resources failed to load. Data may be incomplete.'}
                 </span>
                 <details className="mt-1">
-                  <summary className="text-xs text-amber-400/80 cursor-pointer hover:text-amber-400">
+                  <summary className="text-xs text-amber-400/80 hover:text-amber-400">
                     Show details ({topology.warnings.length})
                   </summary>
                   <ul className="mt-1 text-xs text-theme-text-tertiary space-y-0.5">

@@ -290,7 +290,7 @@ export function WorkloadLogsViewer({ kind, namespace, name }: WorkloadLogsViewer
             {pods.map(pod => (
               <label
                 key={pod.name}
-                className="flex items-center gap-2 px-3 py-2 hover:bg-theme-hover cursor-pointer"
+                className="flex items-center gap-2 px-3 py-2 hover:bg-theme-hover"
               >
                 <input
                   type="checkbox"

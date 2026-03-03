@@ -519,7 +519,7 @@ export function TimelineSwimlanes({ events, isLoading, onResourceClick, viewMode
             </span>
             {/* Group by app toggle */}
             <Tooltip content="Group related resources (Deployment, Service, Pod) by their app.kubernetes.io/name label" position="bottom">
-              <label className="flex items-center gap-1.5 text-xs text-theme-text-secondary cursor-pointer hover:text-theme-text-primary">
+              <label className="flex items-center gap-1.5 text-xs text-theme-text-secondary hover:text-theme-text-primary">
                 <input
                   type="checkbox"
                   checked={groupByApp}
@@ -1233,7 +1233,7 @@ function EventDetailPanel({ event, onClose, onResourceClick }: EventDetailPanelP
             </span>
             <button
               onClick={() => onResourceClick?.({ kind: kindToPlural(event.kind), namespace: event.namespace, name: event.name })}
-              className="text-theme-text-primary font-medium hover:text-blue-600 dark:hover:text-blue-300 cursor-pointer"
+              className="text-theme-text-primary font-medium hover:text-blue-600 dark:hover:text-blue-300"
             >
               {event.name}
             </button>

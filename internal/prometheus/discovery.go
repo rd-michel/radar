@@ -31,8 +31,6 @@ var wellKnownLocations = []struct {
 	{"victoria-metrics", "victoria-metrics-single-server", 8428, ""},
 	{"victoria-metrics", "vmsingle", 8428, ""},
 	{"victoria-metrics", "vmselect", 8481, "/select/0/prometheus"},
-	// VictoriaMetrics — caretta namespace (traffic-specific, lower priority)
-	{"caretta", "caretta-vm", 8428, ""},
 	// kube-prometheus-stack
 	{"monitoring", "kube-prometheus-stack-prometheus", 9090, ""},
 	{"monitoring", "prometheus-kube-prometheus-prometheus", 9090, ""},
@@ -45,6 +43,8 @@ var wellKnownLocations = []struct {
 	{"metrics", "prometheus-server", 0, ""},
 	{"kube-system", "prometheus", 0, ""},
 	{"default", "prometheus", 0, ""},
+	// VictoriaMetrics — caretta namespace (traffic-specific, may lack workload metrics)
+	{"caretta", "caretta-vm", 8428, ""},
 }
 
 // Namespaces commonly used for metrics services

@@ -158,7 +158,7 @@ export function LogsViewer({ namespace, podName, containers, initialContainer }:
 
       {/* Previous logs toggle */}
       <Tooltip content="Show logs from the pod's previous instance (if it was restarted). Useful for troubleshooting crashed containers." position="bottom">
-        <label className="flex items-center gap-1.5 text-xs text-theme-text-secondary cursor-pointer">
+        <label className="flex items-center gap-1.5 text-xs text-theme-text-secondary">
           <input
             type="checkbox"
             checked={showPrevious}

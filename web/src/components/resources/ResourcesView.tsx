@@ -3200,7 +3200,7 @@ export function ResourcesView({ namespaces, selectedResource, onResourceClick, o
 
           {/* ReplicaSet inactive toggle */}
           {selectedKind.name.toLowerCase() === 'replicasets' && inactiveReplicaSetCount > 0 && (
-            <label className="flex items-center gap-1.5 text-xs text-theme-text-tertiary cursor-pointer hover:text-theme-text-secondary">
+            <label className="flex items-center gap-1.5 text-xs text-theme-text-tertiary hover:text-theme-text-secondary">
               <input
                 type="checkbox"
                 checked={showInactiveReplicaSets}
@@ -3265,7 +3265,7 @@ export function ResourcesView({ namespaces, selectedResource, onResourceClick, o
                 {allColumns.map(col => (
                   <label
                     key={col.key}
-                    className="flex items-center gap-2 px-3 py-1.5 hover:bg-theme-elevated cursor-pointer"
+                    className="flex items-center gap-2 px-3 py-1.5 hover:bg-theme-elevated"
                   >
                     <input
                       type="checkbox"
@@ -3318,7 +3318,15 @@ export function ResourcesView({ namespaces, selectedResource, onResourceClick, o
           ) : filteredResources.length === 0 ? (
             <div className="absolute inset-0 flex flex-col items-center justify-center text-theme-text-tertiary">
               <p>No {selectedKind.kind} found</p>
-              {searchTerm && <p className="text-sm mt-1">No results for "{searchTerm}"</p>}
+              {searchTerm && (
+                <button
+                  onClick={() => setSearchTerm('')}
+                  className="flex items-center gap-1.5 text-sm mt-2 px-3 py-1.5 rounded-md bg-theme-elevated hover:bg-theme-border text-theme-text-secondary hover:text-theme-text-primary transition-colors"
+                >
+                  No results for "{searchTerm}"
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              )}
               {namespaces.length > 0 && <p className="text-sm mt-1 text-theme-text-disabled">Searching in {namespaces.length === 1 ? `namespace: ${namespaces[0]}` : `${namespaces.length} namespaces`}</p>}
               {/* Show active filters as dismissible badges so user can clear them */}
               {(() => {

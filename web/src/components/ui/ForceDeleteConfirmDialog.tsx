@@ -43,7 +43,7 @@ export function ForceDeleteConfirmDialog({
       variant="danger"
       isLoading={isLoading}
     >
-      <label className="flex items-center gap-2 text-sm text-theme-text-secondary cursor-pointer">
+      <label className="flex items-center gap-2 text-sm text-theme-text-secondary">
         <input
           type="checkbox"
           checked={forceDelete}

@@ -642,7 +642,7 @@ export function ResourceRefBadge({ resourceRef, onClick }: ResourceRefBadgeProps
       <button
         onClick={() => onClick(resourceRef)}
         className={clsx(
-          'px-2 py-0.5 text-xs rounded border transition-colors hover:brightness-125 cursor-pointer',
+          'px-2 py-0.5 text-xs rounded border transition-colors hover:brightness-125',
           kindClass
         )}
         title={`${resourceRef.kind}: ${resourceRef.namespace}/${resourceRef.name}`}
@@ -677,7 +677,7 @@ export function ResourceLink({ name, kind, namespace = '', group, label, onNavig
   return (
     <button
       onClick={() => onNavigate({ kind, namespace, name, group })}
-      className="text-blue-400 hover:text-blue-300 hover:underline cursor-pointer"
+      className="text-blue-400 hover:text-blue-300 hover:underline"
     >
       {label || name}
     </button>
@@ -715,9 +715,11 @@ function formatKindForRef(kind: string): string {
 interface EventsSectionProps {
   events: TimelineEvent[]
   isLoading?: boolean
+  /** Optional hint shown below the event list (e.g. "See Timeline tab for related resources") */
+  hint?: React.ReactNode
 }
 
-export function EventsSection({ events, isLoading }: EventsSectionProps) {
+export function EventsSection({ events, isLoading, hint }: EventsSectionProps) {
   if (isLoading) {
     return (
       <Section title="Recent Events" defaultExpanded>
@@ -730,6 +732,7 @@ export function EventsSection({ events, isLoading }: EventsSectionProps) {
     return (
       <Section title="Recent Events" defaultExpanded={false}>
         <div className="text-sm text-theme-text-tertiary">No recent events</div>
+        {hint && <div className="mt-2">{hint}</div>}
       </Section>
     )
   }
@@ -770,6 +773,7 @@ export function EventsSection({ events, isLoading }: EventsSectionProps) {
           </div>
         ))}
       </div>
+      {hint && <div className="mt-2">{hint}</div>}
     </Section>
   )
 }

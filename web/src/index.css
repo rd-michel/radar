@@ -3,6 +3,11 @@
 @import "@fontsource-variable/dm-sans";
 @import "@fontsource/dm-mono";
 
+/* Global: pointer cursor for all interactive elements */
+button, [role="button"], a, label, select, summary, [tabindex]:not([tabindex="-1"]) {
+  cursor: pointer;
+}
+
 /* ============================================
    THEME SYSTEM - Central Color Definitions
    ============================================ */

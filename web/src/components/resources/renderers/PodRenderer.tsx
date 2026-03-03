@@ -56,6 +56,8 @@ interface PodRendererProps {
   onCopy: CopyHandler
   copied: string | null
   onNavigate?: (ref: { kind: string; namespace: string; name: string }) => void
+  /** When provided, container-level Logs buttons call this instead of opening the dock */
+  onOpenLogs?: (podName: string, containerName: string) => void
 }
 
 // Extract problems from pod status and conditions
@@ -122,7 +124,7 @@ function getPodProblems(data: any): string[] {
   return problems
 }
 
-export function PodRenderer({ data, onCopy, copied, onNavigate }: PodRendererProps) {
+export function PodRenderer({ data, onCopy, copied, onNavigate, onOpenLogs: onOpenLogsOverride }: PodRendererProps) {
   const containerStatuses = data.status?.containerStatuses || []
   const containers = data.spec?.containers || []
   const initContainers = data.spec?.initContainers || []
@@ -185,6 +187,10 @@ export function PodRenderer({ data, onCopy, copied, onNavigate }: PodRendererPro
   ]
 
   const handleOpenLogs = (containerName?: string) => {
+    if (onOpenLogsOverride && podName && containerName) {
+      onOpenLogsOverride(podName, containerName)
+      return
+    }
     if (namespace && podName) {
       openLogs({
         namespace,

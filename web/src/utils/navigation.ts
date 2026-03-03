@@ -57,8 +57,8 @@ export function kindToPlural(kind: string): string {
 
 /**
  * Convert a plural API resource name (e.g., "deployments") back to singular PascalCase kind (e.g., "Deployment").
- * Inverse of kindToPlural. Used by ResourceDetailPage which receives the plural form from the URL
- * but needs the singular PascalCase form for internal logic (health checks, badge colors, hierarchy matching).
+ * Inverse of kindToPlural. Converts plural API resource names from URLs back to
+ * singular PascalCase form for internal logic (health checks, badge colors, hierarchy matching).
  */
 export function pluralToKind(plural: string): string {
   const lower = plural.toLowerCase()

@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { Copy, Check, ChevronUp, ChevronDown, X, Search } from 'lucide-react'
 import { codeToHtml } from 'shiki'
+import { useTheme } from '../../context/ThemeContext'
 
 interface CodeViewerProps {
   code: string
@@ -21,6 +22,7 @@ export function CodeViewer({
   onCopy,
   copied = false,
 }: CodeViewerProps) {
+  const { theme } = useTheme()
   const [html, setHtml] = useState<string>('')
   const [highlighting, setHighlighting] = useState(true)
 
@@ -52,7 +54,7 @@ export function CodeViewer({
 
     codeToHtml(code, {
       lang: shikiLang,
-      theme: 'github-dark',
+      theme: theme === 'light' ? 'github-light' : 'github-dark',
     })
       .then((highlighted) => {
         setHtml(highlighted)
@@ -67,7 +69,7 @@ export function CodeViewer({
         htmlRef.current = fallback
         setHighlighting(false)
       })
-  }, [code, language])
+  }, [code, language, theme])
 
   // Set innerHTML via ref so React doesn't manage it (preserves our <mark> elements across re-renders)
   useEffect(() => {
@@ -319,7 +321,7 @@ export function CodeViewer({
   return (
     <div
       ref={wrapperRef}
-      className="relative rounded-lg overflow-hidden bg-[#0d1117]"
+      className={`relative rounded-lg overflow-hidden ${theme === 'light' ? 'bg-[#ffffff]' : 'bg-[#0d1117]'}`}
       tabIndex={0}
       onKeyDown={handleWrapperKeyDown}
       onMouseEnter={() => { isMouseInsideRef.current = true }}
@@ -398,6 +400,8 @@ export function CodeViewer({
       </div>
 
       <style>{`
+        :root[data-theme="light"] { --code-line-number: #8b949e; }
+        :root[data-theme="dark"] { --code-line-number: #484f58; }
         .shiki-viewer pre {
           margin: 0;
           padding: 12px;
@@ -423,7 +427,7 @@ export function CodeViewer({
           width: 3ch;
           margin-right: 1.5ch;
           text-align: right;
-          color: #484f58;
+          color: var(--code-line-number, #484f58);
           user-select: none;
         }
         .shiki-viewer .line:hover {

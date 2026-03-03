@@ -107,7 +107,7 @@ export function displayKind(kind: string): string {
 
 export type HealthStatus = 'healthy' | 'degraded' | 'unhealthy' | 'unknown'
 
-export type EdgeType = 'routes-to' | 'exposes' | 'manages' | 'uses' | 'configures'
+export type EdgeType = 'routes-to' | 'exposes' | 'manages' | 'uses' | 'configures' | 'protects'
 
 export interface TopologyNode {
   id: string

@@ -19,7 +19,7 @@ function CopyButton({ text }: { text: string }) {
   return (
     <button
       onClick={handleCopy}
-      className="absolute top-2 right-2 p-1.5 rounded-md bg-theme-elevated/50 hover:bg-theme-elevated text-theme-text-tertiary hover:text-theme-text-secondary transition-colors cursor-pointer"
+      className="absolute top-2 right-2 p-1.5 rounded-md bg-theme-elevated/50 hover:bg-theme-elevated text-theme-text-tertiary hover:text-theme-text-secondary transition-colors"
       title="Copy to clipboard"
     >
       {copied ? <Check className="w-3.5 h-3.5 text-green-500" /> : <Copy className="w-3.5 h-3.5" />}
@@ -132,7 +132,7 @@ export function MCPSetupDialog({ open, onClose, mcpUrl }: MCPSetupDialogProps) {
             <Radio className="w-5 h-5 text-purple-400" />
             <h3 className="text-lg font-semibold text-theme-text-primary">MCP Server</h3>
           </div>
-          <button onClick={onClose} className="p-1.5 hover:bg-theme-elevated rounded-md transition-colors cursor-pointer">
+          <button onClick={onClose} className="p-1.5 hover:bg-theme-elevated rounded-md transition-colors">
             <X className="w-5 h-5 text-theme-text-tertiary" />
           </button>
         </div>
@@ -187,7 +187,7 @@ export function MCPSetupDialog({ open, onClose, mcpUrl }: MCPSetupDialogProps) {
               { icon: Terminal, name: 'Gemini CLI', path: '~/.gemini/settings.json', config: geminiConfig },
             ].map((agent) => (
               <details key={agent.name} className="group rounded-md border border-theme-border/50 bg-theme-base/30">
-                <summary className="flex items-center gap-2 px-3 py-2 cursor-pointer select-none list-none hover:bg-theme-hover/50 rounded-md transition-colors [&::-webkit-details-marker]:hidden">
+                <summary className="flex items-center gap-2 px-3 py-2 select-none list-none hover:bg-theme-hover/50 rounded-md transition-colors [&::-webkit-details-marker]:hidden">
                   <ChevronRight className="w-3.5 h-3.5 text-theme-text-tertiary transition-transform group-open:rotate-90" />
                   <agent.icon className="w-4 h-4 text-theme-text-tertiary" />
                   <span className="text-sm font-medium text-theme-text-primary">{agent.name}</span>
@@ -312,7 +312,7 @@ export function MCPSetupDialog({ open, onClose, mcpUrl }: MCPSetupDialogProps) {
           </a>
           <button
             onClick={onClose}
-            className="px-4 py-2 text-sm font-medium rounded-lg hover:bg-theme-elevated transition-colors cursor-pointer text-theme-text-secondary"
+            className="px-4 py-2 text-sm font-medium rounded-lg hover:bg-theme-elevated transition-colors text-theme-text-secondary"
           >
             Close
           </button>

@@ -1,7 +1,7 @@
 /**
  * Shared timeline components and utilities.
  *
- * These components are used by both TimelineSwimlanes.tsx and the EventsTab in ResourceDetailPage.
+ * These components are used by both TimelineSwimlanes.tsx and the EventsTab in WorkloadView.
  * They ensure consistent behavior for time formatting, zoom controls, legends, and markers.
  */
 

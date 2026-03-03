@@ -74,9 +74,11 @@ interface PrometheusChartsProps {
   kind: string
   namespace: string
   name: string
+  /** When true, show "no data" empty state instead of hiding. Defaults to false (hide when no data). */
+  showEmptyState?: boolean
 }
 
-export function PrometheusCharts({ kind, namespace, name }: PrometheusChartsProps) {
+export function PrometheusCharts({ kind, namespace, name, showEmptyState = false }: PrometheusChartsProps) {
   const { data: status, isLoading: statusLoading } = usePrometheusStatus()
   const connectMutation = usePrometheusConnect()
 
@@ -97,14 +99,21 @@ export function PrometheusCharts({ kind, namespace, name }: PrometheusChartsProp
     return null
   }
 
-  // Loading state — checking Prometheus availability
+  // Loading state — checking Prometheus availability (only show when explicitly requested)
   if (statusLoading) {
+    if (!showEmptyState) return null
     return (
       <div className="flex items-center justify-center py-12 text-theme-text-tertiary">
         <Loader2 className="w-5 h-5 animate-spin mr-2" />
         Checking Prometheus availability...
       </div>
     )
+  }
+
+  // When embedded in Overview (showEmptyState=false), hide when not connected or no data
+  if (!showEmptyState) {
+    if (!isConnected) return null
+    if (!metricsLoading && !metricsError && !metrics?.result?.series?.length) return null
   }
 
   if (!isConnected) {
@@ -162,7 +171,7 @@ export function PrometheusCharts({ kind, namespace, name }: PrometheusChartsProp
         <select
           value={timeRange}
           onChange={e => setTimeRange(e.target.value as PrometheusTimeRange)}
-          className="px-2 py-1 text-xs rounded-md bg-theme-elevated border border-theme-border text-theme-text-secondary cursor-pointer focus:outline-none focus:ring-1 focus:ring-blue-500/50"
+          className="px-2 py-1 text-xs rounded-md bg-theme-elevated border border-theme-border text-theme-text-secondary focus:outline-none focus:ring-1 focus:ring-blue-500/50"
         >
           {TIME_RANGES.map(tr => (
             <option key={tr.value} value={tr.value}>{tr.label}</option>

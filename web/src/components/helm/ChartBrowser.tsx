@@ -172,7 +172,7 @@ export function ChartBrowser({ onChartSelect }: ChartBrowserProps) {
         {/* ArtifactHub filters */}
         {chartSource === 'artifacthub' && (
           <div className="flex items-center gap-3">
-            <label className="flex items-center gap-1.5 text-sm text-theme-text-secondary cursor-pointer">
+            <label className="flex items-center gap-1.5 text-sm text-theme-text-secondary">
               <input
                 type="checkbox"
                 checked={showOfficialOnly}
@@ -182,7 +182,7 @@ export function ChartBrowser({ onChartSelect }: ChartBrowserProps) {
               <BadgeCheck className="w-3.5 h-3.5 text-blue-400" />
               Official
             </label>
-            <label className="flex items-center gap-1.5 text-sm text-theme-text-secondary cursor-pointer">
+            <label className="flex items-center gap-1.5 text-sm text-theme-text-secondary">
               <input
                 type="checkbox"
                 checked={showVerifiedOnly}
@@ -223,7 +223,7 @@ export function ChartBrowser({ onChartSelect }: ChartBrowserProps) {
         {/* Options (only for local) */}
         {chartSource === 'local' && (
           <>
-            <label className="flex items-center gap-2 text-sm text-theme-text-secondary cursor-pointer">
+            <label className="flex items-center gap-2 text-sm text-theme-text-secondary">
               <input
                 type="checkbox"
                 checked={showAllVersions}

@@ -209,7 +209,7 @@ export function ClusterHealthCard({
             {mcpEnabled && (
               <button
                 onClick={() => setMcpDialogOpen(true)}
-                className="flex items-center gap-2 mt-3 px-2.5 py-2 bg-purple-500/5 hover:bg-purple-500/10 border border-purple-500/20 rounded-md transition-colors cursor-pointer w-full"
+                className="flex items-center gap-2 mt-3 px-2.5 py-2 bg-purple-500/5 hover:bg-purple-500/10 border border-purple-500/20 rounded-md transition-colors w-full"
               >
                 <Radio className="w-3.5 h-3.5 text-purple-400 animate-pulse shrink-0" />
                 <div className="flex flex-col gap-0.5 min-w-0 flex-1 text-left">
@@ -232,7 +232,7 @@ export function ClusterHealthCard({
             ) : (
               <button
                 onClick={() => onNavigateToKind('pods')}
-                className="flex flex-col items-center gap-2 cursor-pointer hover:-translate-y-1 hover:scale-105 transition-all duration-200"
+                className="flex flex-col items-center gap-2 hover:-translate-y-1 hover:scale-105 transition-all duration-200"
               >
                 <HealthRing segments={podsRingSegments} size={88} strokeWidth={8} label={String(podsTotal)} />
                 <span className="text-xs font-medium text-theme-text-secondary">Pods</span>
@@ -265,7 +265,7 @@ export function ClusterHealthCard({
             ) : (
               <button
                 onClick={() => onNavigateToKind('deployments')}
-                className="flex flex-col items-center gap-2 cursor-pointer hover:-translate-y-1 hover:scale-105 transition-all duration-200"
+                className="flex flex-col items-center gap-2 hover:-translate-y-1 hover:scale-105 transition-all duration-200"
               >
                 <HealthRing segments={deploymentsRingSegments} size={88} strokeWidth={8} label={String(counts.deployments.total)} />
                 <span className="text-xs font-medium text-theme-text-secondary">Deployments</span>
@@ -284,7 +284,7 @@ export function ClusterHealthCard({
             ) : (
               <button
                 onClick={() => onNavigateToKind('nodes')}
-                className="flex flex-col items-center gap-2 cursor-pointer hover:-translate-y-1 hover:scale-105 transition-all duration-200"
+                className="flex flex-col items-center gap-2 hover:-translate-y-1 hover:scale-105 transition-all duration-200"
               >
                 <HealthRing segments={nodesRingSegments} size={88} strokeWidth={8} label={String(counts.nodes.total)} />
                 <span className="text-xs font-medium text-theme-text-secondary">Nodes</span>
@@ -366,7 +366,7 @@ export function ClusterHealthCard({
             <button
               onClick={onWarningEventsClick}
               title="Native Kubernetes Warning events (e.g., ImagePullBackOff, FailedScheduling)"
-              className="flex items-center gap-1.5 w-fit px-2.5 py-1.5 bg-yellow-500/10 hover:bg-yellow-500/20 border border-yellow-500/30 rounded-md transition-colors cursor-pointer"
+              className="flex items-center gap-1.5 w-fit px-2.5 py-1.5 bg-yellow-500/10 hover:bg-yellow-500/20 border border-yellow-500/30 rounded-md transition-colors"
             >
               <AlertTriangle className="w-3.5 h-3.5 text-yellow-500" />
               <span className="text-xs text-yellow-500 font-medium">{health.warningEvents} Warning Events</span>
@@ -376,7 +376,7 @@ export function ClusterHealthCard({
             <button
               onClick={onUnhealthyClick}
               title="View timeline of unhealthy/degraded workload events"
-              className="flex items-center gap-1.5 w-fit px-2.5 py-1.5 bg-red-500/10 hover:bg-red-500/20 border border-red-500/30 rounded-md transition-colors cursor-pointer"
+              className="flex items-center gap-1.5 w-fit px-2.5 py-1.5 bg-red-500/10 hover:bg-red-500/20 border border-red-500/30 rounded-md transition-colors"
             >
               <AlertTriangle className="w-3.5 h-3.5 text-red-500" />
               <span className="text-xs text-red-500 font-medium">View unhealthy workload events</span>
@@ -390,7 +390,7 @@ export function ClusterHealthCard({
             <button
               key={res.kind}
               onClick={() => onNavigateToKind(res.kind, res.group)}
-              className="flex items-center gap-1.5 px-2 py-1 rounded hover:bg-theme-hover transition-colors cursor-pointer text-sm"
+              className="flex items-center gap-1.5 px-2 py-1 rounded hover:bg-theme-hover transition-colors text-sm"
             >
               {isRestricted(res.kind) ? (
                 <>
@@ -417,7 +417,7 @@ export function ClusterHealthCard({
         <div className="flex items-center justify-center w-[300px] shrink-0 pl-8 border-l border-theme-border/50">
           <button
             onClick={onNavigateToView}
-            className="flex items-center gap-2 text-base font-medium text-blue-500 hover:text-blue-400 transition-colors cursor-pointer"
+            className="flex items-center gap-2 text-base font-medium text-blue-500 hover:text-blue-400 transition-colors"
           >
             Browse All Resources
             <ArrowRight className="w-5 h-5" />
